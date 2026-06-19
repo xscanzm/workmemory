@@ -1,0 +1,62 @@
+{
+  "name": "workmemory",
+  "version": "0.1.0",
+  "description": "今日记忆 - 个人工作记忆助手",
+  "main": "dist/main/index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:renderer\" \"npm run dev:main\"",
+    "dev:renderer": "vite",
+    "dev:main": "tsc -p tsconfig.main.json && electron .",
+    "build": "npm run build:renderer && npm run build:main",
+    "build:renderer": "vite build",
+    "build:main": "tsc -p tsconfig.main.json",
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "typecheck": "tsc --noEmit -p tsconfig.main.json && tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "sql.js": "^1.10.0",
+    "screenshot-desktop": "^1.15.0",
+    "active-win": "^8.2.0",
+    "node-cron": "^3.0.3",
+    "uuid": "^10.0.0"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.0",
+    "typescript": "^5.5.0",
+    "vite": "^5.3.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@types/uuid": "^10.0.0",
+    "concurrently": "^8.2.0",
+    "react-router-dom": "^6.24.0",
+    "zustand": "^4.5.0",
+    "lucide-react": "^0.400.0",
+    "date-fns": "^3.6.0",
+    "clsx": "^2.1.0"
+  },
+  "build": {
+    "appId": "com.workmemory.app",
+    "productName": "今日记忆",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

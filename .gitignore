@@ -1,0 +1,13 @@
+node_modules/
+dist/
+release/
+*.db
+*.db-journal
+*.db-wal
+.env
+screenshots/
+temp/
+logs/
+exports/
+.DS_Store
+Thumbs.db
