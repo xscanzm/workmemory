@@ -18,6 +18,9 @@ import type {
   SmartReminder,
   AnomalyDetection,
   PetCharacter,
+  AiExtractResult,
+  NarrativeResult,
+  PetEmotionState,
 } from "../../shared/types";
 
 export interface WorkMemoryApi {
@@ -139,6 +142,14 @@ export interface WorkMemoryApi {
   insightsDismissReminder: (id: string) => Promise<boolean>;
   insightsGetAnomalies: (includeDismissed?: boolean) => Promise<AnomalyDetection[]>;
   insightsRefresh: () => Promise<{ insights: number; anomalies: number }>;
+
+  // Ultimate Experience (终极体验)
+  memorySearchInstant: (keyword: string) => Promise<SegmentSearchResult[]>;
+  memoryGetTimelapse: (segmentId: string, timestamp: number) => Promise<string[]>;
+  aiExtractInsight: (ocrText: string) => Promise<AiExtractResult | null>;
+  knowledgeDirectFeed: (content: string, source: string) => Promise<KnowledgeNode>;
+  onPetSyncEmotions: (callback: (state: PetEmotionState) => void) => () => void;
+  insightsFetchNarrative: (weekId: number) => Promise<NarrativeResult | null>;
 
   // Navigation
   onNavigate: (callback: (route: string) => void) => () => void;

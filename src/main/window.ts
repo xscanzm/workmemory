@@ -74,4 +74,73 @@ export function closeMainWindow(): void {
   }
 }
 
+// ==========================================
+// MiniSearch 全局闪查窗口
+// ==========================================
+let miniSearchWindow: BrowserWindow | null = null;
+
+export function createMiniSearchWindow(): BrowserWindow {
+  if (miniSearchWindow && !miniSearchWindow.isDestroyed()) {
+    return miniSearchWindow;
+  }
+  miniSearchWindow = new BrowserWindow({
+    width: 760,
+    height: 480,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    show: false,
+    skipTaskbar: true,
+    resizable: false,
+    maximizable: false,
+    minimizable: false,
+    hasShadow: false,
+    webPreferences: {
+      preload: path.join(__dirname, "../preload/index.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+    },
+  });
+  // 加载 mini-search 页面（通过 hash 路由）
+  if (process.env.NODE_ENV === "development" || process.env.VITE_DEV_SERVER_URL) {
+    miniSearchWindow.loadURL("http://localhost:5173/#/mini-search");
+  } else {
+    miniSearchWindow.loadFile(path.join(__dirname, "../renderer/index.html"), { hash: "/mini-search" });
+  }
+  // 失焦自动隐藏
+  miniSearchWindow.on("blur", () => {
+    miniSearchWindow?.hide();
+  });
+  return miniSearchWindow;
+}
+
+export function getMiniSearchWindow(): BrowserWindow | null {
+  return miniSearchWindow;
+}
+
+export function showMiniSearchWindow(): void {
+  if (!miniSearchWindow || miniSearchWindow.isDestroyed()) {
+    createMiniSearchWindow();
+  }
+  // 跟随鼠标所在显示器居中偏上 1/3
+  const { x, y } = screen.getCursorScreenPoint();
+  const currentDisplay = screen.getDisplayNearestPoint({ x, y });
+  const { width, height } = currentDisplay.workArea;
+  const winWidth = 760;
+  const winHeight = 480;
+  miniSearchWindow!.setPosition(
+    Math.round(currentDisplay.workArea.x + (width - winWidth) / 2),
+    Math.round(currentDisplay.workArea.y + (height - winHeight) / 3)
+  );
+  miniSearchWindow!.show();
+  miniSearchWindow!.focus();
+}
+
+export function hideMiniSearchWindow(): void {
+  if (miniSearchWindow && !miniSearchWindow.isDestroyed()) {
+    miniSearchWindow.hide();
+  }
+}
+
 export { mainWindow };

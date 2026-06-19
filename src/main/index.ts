@@ -1,4 +1,4 @@
-import { app } from "electron";
+import { app, globalShortcut } from "electron";
 import { createMainWindow, showMainWindow } from "./window";
 import { createTray, destroyTray } from "./tray";
 import { registerIpcHandlers } from "./ipc-handlers";
@@ -10,7 +10,9 @@ import { templateRepo } from "./database/repositories/template-repo";
 import { eventLogRepo } from "./database/repositories/event-log-repo";
 import { configRepo } from "./database/repositories/config-repo";
 import { createPetWindow, destroyPetWindow, registerPetIpcHandlers, setLaunchAtStartup } from "./pet-window";
+import { createMiniSearchWindow, showMiniSearchWindow, hideMiniSearchWindow } from "./window";
 import { insightsService } from "./services/insights-service";
+import { dailySummaryService } from "./services/daily-summary-service";
 
 // Prevent multiple instances
 const gotTheLock = app.requestSingleInstanceLock();
@@ -56,6 +58,20 @@ app.whenReady().then(async () => {
     // Create desktop pet window (if enabled)
     createPetWindow();
 
+    // 创建 MiniSearch 窗口（不显示）
+    createMiniSearchWindow();
+
+    // 注册 Alt+Space 全局热键
+    globalShortcut.register("Alt+Space", () => {
+      const { getMiniSearchWindow } = require("./window");
+      const win = getMiniSearchWindow();
+      if (win && win.isVisible()) {
+        hideMiniSearchWindow();
+      } else {
+        showMiniSearchWindow();
+      }
+    });
+
     // Apply auto-launch setting
     const config = await configRepo.getConfig();
     setLaunchAtStartup(config.launchAtStartup);
@@ -69,6 +85,19 @@ app.whenReady().then(async () => {
       }
     }, 10000);
 
+    // 周五 17:30 自动生成叙事手记
+    const cron = require("node-cron");
+    cron.schedule("30 17 * * 5", async () => {
+      try {
+        const now = new Date();
+        const weekId = Math.floor(now.getTime() / (7 * 24 * 60 * 60 * 1000));
+        await dailySummaryService.generateNarrative(weekId);
+        await eventLogRepo.info("narrative", "周五叙事手记已自动生成");
+      } catch (error: any) {
+        console.warn("Narrative auto-generation failed:", error);
+      }
+    });
+
     await eventLogRepo.info("app", "应用已启动");
   } catch (error: any) {
     console.error("应用启动失败:", error);
@@ -81,6 +110,7 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
+  globalShortcut.unregisterAll();
   recorderService.pause();
   captureService.cleanTempDir();
   destroyTray();

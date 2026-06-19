@@ -1,4 +1,4 @@
-import { WindowSnapshot } from "../../shared/types";
+import { WindowSnapshot, PetEmotionState } from "../../shared/types";
 
 /**
  * WindowWatcher - 活跃窗口监听服务
@@ -8,6 +8,12 @@ export class WindowWatcher {
   private watchInterval: NodeJS.Timeout | null = null;
   private lastSnapshot: WindowSnapshot | null = null;
   private onWindowChange: ((snapshot: WindowSnapshot) => void) | null = null;
+
+  // === 情绪追踪相关字段 ===
+  private windowSwitchHistory: number[] = []; // 最近3分钟每分钟的切换次数
+  private currentMinuteSwitches = 0;
+  private emotionTimer: NodeJS.Timeout | null = null;
+  private onEmotionCallback: ((state: PetEmotionState) => void) | null = null;
 
   /**
    * 获取当前前台窗口快照
@@ -53,6 +59,8 @@ export class WindowWatcher {
       // Check if window changed
       if (this.hasWindowChanged(snapshot)) {
         this.lastSnapshot = snapshot;
+        // 窗口切换时递增当前分钟计数（用于情绪追踪）
+        this.currentMinuteSwitches++;
         this.onWindowChange?.(snapshot);
       }
     }, intervalMs);
@@ -81,6 +89,52 @@ export class WindowWatcher {
       this.lastSnapshot.appName !== snapshot.appName ||
       this.lastSnapshot.processName !== snapshot.processName
     );
+  }
+
+  /**
+   * 开始情绪追踪（3分钟滑窗算法）
+   * 每分钟评估一次：根据最近3分钟累计的窗口切换次数判定情绪状态
+   * - DEEP_WORK: 累计切换 ≤2 次（低切换频次视为专注）
+   * - ANXIOUS: 累计切换 ≥7 次（高切换频次视为焦虑）
+   * - IDLE: 其他情况
+   */
+  startEmotionTracking(onEmotion: (state: PetEmotionState) => void): void {
+    this.stopEmotionTracking();
+    this.onEmotionCallback = onEmotion;
+    this.windowSwitchHistory = [];
+    this.currentMinuteSwitches = 0;
+
+    this.emotionTimer = setInterval(() => {
+      // 每分钟：推入历史，保留最近3分钟
+      this.windowSwitchHistory.push(this.currentMinuteSwitches);
+      if (this.windowSwitchHistory.length > 3) {
+        this.windowSwitchHistory.shift();
+      }
+      const totalSwitches = this.windowSwitchHistory.reduce((a, b) => a + b, 0);
+
+      let state: PetEmotionState = "IDLE";
+      if (totalSwitches <= 2) {
+        state = "DEEP_WORK"; // 低切换频次视为专注
+      } else if (totalSwitches >= 7) {
+        state = "ANXIOUS"; // 高切换频次视为焦虑
+      }
+
+      this.onEmotionCallback?.(state);
+      this.currentMinuteSwitches = 0; // 重置当前分钟计数
+    }, 60000);
+  }
+
+  /**
+   * 停止情绪追踪
+   */
+  stopEmotionTracking(): void {
+    if (this.emotionTimer) {
+      clearInterval(this.emotionTimer);
+      this.emotionTimer = null;
+    }
+    this.onEmotionCallback = null;
+    this.windowSwitchHistory = [];
+    this.currentMinuteSwitches = 0;
   }
 }
 

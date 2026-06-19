@@ -149,6 +149,25 @@ const api = {
     ipcRenderer.invoke(IPC_CHANNELS.INSIGHTS_GET_ANOMALIES, includeDismissed),
   insightsRefresh: () => ipcRenderer.invoke(IPC_CHANNELS.INSIGHTS_REFRESH),
 
+  // === Ultimate Experience (终极体验) ===
+  memorySearchInstant: (keyword: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.MEMORY_SEARCH_INSTANT, keyword),
+  memoryGetTimelapse: (segmentId: string, timestamp: number) =>
+    ipcRenderer.invoke(IPC_CHANNELS.MEMORY_GET_TIMELAPSE, segmentId, timestamp),
+  aiExtractInsight: (ocrText: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.AI_EXTRACT_INSIGHT, ocrText),
+  knowledgeDirectFeed: (content: string, source: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.KNOWLEDGE_DIRECT_FEED, content, source),
+  onPetSyncEmotions: (callback: (state: string) => void) => {
+    const handler = (_event: any, state: string) => callback(state);
+    ipcRenderer.on(IPC_CHANNELS.PET_SYNC_EMOTIONS, handler);
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.PET_SYNC_EMOTIONS, handler);
+    };
+  },
+  insightsFetchNarrative: (weekId: number) =>
+    ipcRenderer.invoke(IPC_CHANNELS.INSIGHTS_FETCH_NARRATIVE, weekId),
+
   // Navigation listener
   onNavigate: (callback: (route: string) => void) => {
     const handler = (_event: any, route: string) => callback(route);

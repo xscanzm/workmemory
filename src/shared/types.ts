@@ -85,6 +85,8 @@ export interface AppConfig {
   insightsEnabled: boolean;
   smartReminderEnabled: boolean;
   anomalyDetectionEnabled: boolean;
+  // 叙事复盘
+  narrativeEnabled?: boolean;
 }
 
 export type PetCharacter = "cat" | "robot" | "ghost" | "droplet" | "fox" | "star";
@@ -115,6 +117,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   insightsEnabled: true,
   smartReminderEnabled: true,
   anomalyDetectionEnabled: true,
+  narrativeEnabled: true,
 };
 
 // --- Privacy Rule ---
@@ -320,6 +323,14 @@ export const IPC_CHANNELS = {
   INSIGHTS_DISMISS_REMINDER: "insights:dismiss-reminder",
   INSIGHTS_GET_ANOMALIES: "insights:get-anomalies",
   INSIGHTS_REFRESH: "insights:refresh",
+
+  // Ultimate Experience (终极体验)
+  MEMORY_SEARCH_INSTANT: "memory:search-instant",
+  MEMORY_GET_TIMELAPSE: "memory:get-timelapse",
+  AI_EXTRACT_INSIGHT: "ai:extract-insight",
+  KNOWLEDGE_DIRECT_FEED: "knowledge:direct-feed",
+  PET_SYNC_EMOTIONS: "pet:sync-emotions",
+  INSIGHTS_FETCH_NARRATIVE: "insights:fetch-narrative",
 } as const;
 
 // --- Daily Summary (每日一句话总结) ---
@@ -481,4 +492,31 @@ export interface AnomalyDetection {
   severity: "low" | "medium" | "high";
   dismissed: boolean;
   metadata?: Record<string, any>;
+}
+
+// ============================================================
+// Module 5: Ultimate Experience (终极体验)
+// ============================================================
+
+// --- Pet Emotion State (心流情绪状态) ---
+export type PetEmotionState = "DEEP_WORK" | "ANXIOUS" | "IDLE";
+
+// --- AI Extract Result (闪电萃取结果) ---
+export interface AiExtractResult {
+  goldSentence: string;
+  tags: string[];
+}
+
+// --- Narrative Result (叙事复盘结果) ---
+export interface NarrativeResult {
+  narrativeText: string;
+  weekId: number;
+  generatedAt: string;
+  generatedBy: "ai" | "rule";
+}
+
+// --- Direct Feed Payload (灵感投喂载荷) ---
+export interface DirectFeedPayload {
+  content: string;
+  source: "PET_BAG" | "MANUAL";
 }

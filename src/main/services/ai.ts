@@ -2,7 +2,7 @@ import { aiConfigRepo } from "../database/repositories/ai-config-repo";
 import { segmentRepo } from "../database/repositories/segment-repo";
 import { templateRepo } from "../database/repositories/template-repo";
 import { renderTemplate, formatSegmentsForPrompt } from "./templates";
-import { AiGenerationInput, AiSegmentInput } from "../../shared/types";
+import { AiGenerationInput, AiSegmentInput, AiProviderConfig } from "../../shared/types";
 
 /**
  * AiService - AI 日报生成服务
@@ -121,6 +121,41 @@ export class AiService {
         error: `AI 请求失败: ${error?.message || "未知错误"}`,
       };
     }
+  }
+
+  /**
+   * 通用对话接口（闪电萃取等场景使用）
+   * 接收已查出的 AI 配置和 prompt，返回纯文本内容；失败时抛出异常
+   */
+  async chat(config: AiProviderConfig, prompt: string): Promise<string> {
+    const apiKey = await aiConfigRepo.getDecryptedApiKey(config.id);
+    if (!apiKey) {
+      throw new Error("无法获取 API Key");
+    }
+
+    const url = `${config.baseUrl}/chat/completions`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: config.model,
+        messages: [{ role: "user", content: prompt }],
+        temperature: config.temperature,
+        max_tokens: config.maxTokens || 4096,
+        stream: false,
+      }),
+      signal: AbortSignal.timeout(config.timeoutSeconds * 1000),
+    });
+
+    if (!response.ok) {
+      throw new Error(`AI 请求失败 (${response.status})`);
+    }
+
+    const data = await response.json() as any;
+    return data.choices?.[0]?.message?.content || "";
   }
 
   async testConnection(configId?: string): Promise<{ success: boolean; error?: string }> {

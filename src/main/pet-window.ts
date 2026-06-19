@@ -2,6 +2,7 @@ import { BrowserWindow, screen, ipcMain, app } from "electron";
 import path from "path";
 import { recorderService } from "./services/recorder";
 import { configRepo } from "./database/repositories/config-repo";
+import { windowWatcher } from "./services/window-watcher";
 import { IPC_CHANNELS, PetCharacter } from "../shared/types";
 
 let petWindow: BrowserWindow | null = null;
@@ -67,6 +68,11 @@ export async function createPetWindow(): Promise<void> {
   petWindow.webContents.once("did-finish-load", () => {
     sendPetStatus(recorderService.getStatus());
     sendPetCharacter(petCharacter);
+  });
+
+  // 启动情绪追踪：根据窗口切换频次向宠物同步情绪状态
+  windowWatcher.startEmotionTracking((state) => {
+    sendPetEmotion(state);
   });
 }
 
@@ -148,6 +154,15 @@ function sendPetCharacter(character: string): void {
   }
 }
 
+/**
+ * 向宠物窗口同步情绪状态
+ */
+function sendPetEmotion(state: string): void {
+  if (petWindow && !petWindow.isDestroyed()) {
+    petWindow.webContents.send(IPC_CHANNELS.PET_SYNC_EMOTIONS, state);
+  }
+}
+
 export async function setPetEnabled(enabled: boolean): Promise<void> {
   petEnabled = enabled;
   if (enabled) {
@@ -175,6 +190,8 @@ export function destroyPetWindow(): void {
     petWindow.destroy();
     petWindow = null;
   }
+  // 停止情绪追踪
+  windowWatcher.stopEmotionTracking();
 }
 
 export function getPetWindow(): BrowserWindow | null {

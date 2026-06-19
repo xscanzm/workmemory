@@ -113,6 +113,21 @@ export class KnowledgeRepository {
   }
 
   /**
+   * 直接投喂内容到知识库（来自宠物口袋）
+   * KnowledgeNode.source 限定为 manual|extracted|imported，
+   * 因此 source 参数作为标签保留，实际入库 source 使用 "manual"
+   */
+  async directFeed(content: string, source: string = "PET_BAG"): Promise<KnowledgeNode> {
+    const title = content.substring(0, 30).replace(/\n/g, " ").trim() || "未命名灵感";
+    return this.save({
+      title,
+      content,
+      tags: ["灵感投喂", source],
+      source: "manual",
+    });
+  }
+
+  /**
    * 搜索知识点（标题 + 内容 + 标签）
    */
   async search(query: string): Promise<KnowledgeNode[]> {

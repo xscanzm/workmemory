@@ -2,7 +2,7 @@
   "name": "workmemory",
   "version": "0.1.0",
   "description": "今日记忆 - 个人工作记忆助手",
-  "main": "dist/main/index.js",
+  "main": "dist/main/main/index.js",
   "scripts": {
     "dev": "concurrently \"npm run dev:renderer\" \"npm run dev:main\"",
     "dev:renderer": "vite",

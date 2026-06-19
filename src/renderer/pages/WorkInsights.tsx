@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useAppStore } from "../stores/app-store";
-import type { WorkStats } from "../../shared/types";
+import type { WorkStats, NarrativeResult } from "../../shared/types";
 import {
   ClockIcon,
   LayoutIcon,
@@ -17,10 +17,36 @@ export function WorkInsights() {
   const [stats, setStats] = useState<WorkStats | null>(null);
   const [range, setRange] = useState<"week" | "month">("week");
   const [loading, setLoading] = useState(true);
+  const [narrative, setNarrative] = useState<NarrativeResult | null>(null);
+  const [visibleLines, setVisibleLines] = useState<number>(0);
+
+  // 叙事文本按句号/换行分割成行
+  const lines = narrative?.narrativeText.split(/[。！？\n]/).filter(Boolean) || [];
 
   useEffect(() => {
     loadStats();
+    loadNarrative();
   }, [range]);
+
+  // 叙事手记逐行淡入动画
+  useEffect(() => {
+    if (narrative && lines.length > 0) {
+      setVisibleLines(0);
+      lines.forEach((_, idx) => {
+        setTimeout(() => setVisibleLines(idx + 1), idx * 400);
+      });
+    }
+  }, [narrative]);
+
+  const loadNarrative = async () => {
+    try {
+      // 0 表示当前周
+      const result = await api.insightsFetchNarrative(0);
+      setNarrative(result);
+    } catch (err) {
+      console.error("Failed to load narrative:", err);
+    }
+  };
 
   const loadStats = async () => {
     setLoading(true);
@@ -128,6 +154,52 @@ export function WorkInsights() {
           </button>
         </div>
       </div>
+
+      {/* 黄昏叙事手记 */}
+      {narrative && (
+        <div
+          className="sunset-gradient-bg"
+          style={{
+            borderRadius: 16,
+            padding: "40px 48px",
+            marginBottom: 24,
+            position: "relative",
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              fontSize: 13,
+              color: "rgba(255,255,255,0.7)",
+              marginBottom: 16,
+              letterSpacing: 2,
+              position: "relative",
+              zIndex: 1,
+            }}
+          >
+            黄昏叙事手记 · 第 {narrative.weekId} 周
+          </div>
+          {lines.map((line, idx) => (
+            <p
+              key={idx}
+              className="blur-fade-line"
+              style={{
+                fontSize: 18,
+                lineHeight: 2,
+                color: "#fff",
+                marginBottom: 8,
+                position: "relative",
+                zIndex: 1,
+                filter: idx < visibleLines ? "blur(0px)" : "blur(8px)",
+                opacity: idx < visibleLines ? 1 : 0,
+                transform: idx < visibleLines ? "translateY(0)" : "translateY(12px)",
+              }}
+            >
+              {line}
+            </p>
+          ))}
+        </div>
+      )}
 
       {/* Overview Stats */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 20 }}>

@@ -271,6 +271,11 @@ export function registerIpcHandlers(): void {
     return segmentRepo.search(query.trim());
   });
 
+  // 全局闪查
+  ipcMain.handle(IPC_CHANNELS.MEMORY_SEARCH_INSTANT, async (_event, keyword: string) => {
+    return segmentRepo.search(keyword);
+  });
+
   // ==========================================
   // Stats
   // ==========================================
@@ -373,6 +378,51 @@ export function registerIpcHandlers(): void {
   );
 
   // ==========================================
+  // Ultimate Experience - 时光微缩院 (Module 2)
+  // ==========================================
+  // 时光倒带
+  ipcMain.handle(IPC_CHANNELS.MEMORY_GET_TIMELAPSE, async (_event, segmentId: string, timestamp: number) => {
+    return segmentRepo.getTimelapseFrames(segmentId, timestamp);
+  });
+
+  // 闪电萃取
+  ipcMain.handle(IPC_CHANNELS.AI_EXTRACT_INSIGHT, async (_event, ocrText: string) => {
+    try {
+      const config = await configRepo.getConfig();
+      if (config.aiProviderConfigId) {
+        const aiConfig = await aiConfigRepo.getById(config.aiProviderConfigId);
+        if (aiConfig) {
+          const prompt = `分析这段OCR内容。忽略任何无意义符号和废话，仅输出：
+1.最核心的认知方法论/关键待办 (限定25字以内)
+2.生成2-3个扁平化高价值标签
+
+OCR内容：
+${ocrText}
+
+请以JSON格式返回：{"goldSentence": "...", "tags": ["标签1", "标签2"]}`;
+          const result = await aiService.chat(aiConfig, prompt);
+          // 尝试解析 JSON
+          try {
+            const parsed = JSON.parse(result);
+            if (parsed.goldSentence && Array.isArray(parsed.tags)) {
+              return { goldSentence: parsed.goldSentence, tags: parsed.tags };
+            }
+          } catch {
+            // JSON 解析失败，降级
+          }
+        }
+      }
+    } catch (error) {
+      console.warn("AI extract insight failed:", error);
+    }
+    // 降级：规则提取
+    const text = ocrText || "";
+    const goldSentence = text.substring(0, 25).replace(/\s+/g, " ").trim() || "无有效内容";
+    const tags = ["工作片段"];
+    return { goldSentence, tags };
+  });
+
+  // ==========================================
   // Wiki Knowledge Base (知识库双链)
   // ==========================================
   ipcMain.handle(IPC_CHANNELS.WIKI_GET_NODES, async () => {
@@ -410,6 +460,13 @@ export function registerIpcHandlers(): void {
   });
 
   // ==========================================
+  // Ultimate Experience - 灵感投喂 (宠物口袋)
+  // ==========================================
+  ipcMain.handle(IPC_CHANNELS.KNOWLEDGE_DIRECT_FEED, async (_event, content: string, source: string) => {
+    return knowledgeRepo.directFeed(content, source);
+  });
+
+  // ==========================================
   // Proactive Intelligence (主动智能)
   // ==========================================
   ipcMain.handle(IPC_CHANNELS.INSIGHTS_GET, async (_event, includeDismissed?: boolean) => {
@@ -436,6 +493,13 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC_CHANNELS.INSIGHTS_REFRESH, async () => {
     return insightsService.refresh();
+  });
+
+  // 叙事复盘
+  ipcMain.handle(IPC_CHANNELS.INSIGHTS_FETCH_NARRATIVE, async (_event, weekId: number) => {
+    const now = new Date();
+    const week = weekId || Math.floor(now.getTime() / (7 * 24 * 60 * 60 * 1000));
+    return dailySummaryService.generateNarrative(week);
   });
 
   // Forward recorder status changes to renderer

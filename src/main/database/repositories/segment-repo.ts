@@ -420,6 +420,26 @@ export class SegmentRepository {
     );
     return rows.map(this.mapRowToSegment);
   }
+
+  /**
+   * 获取指定片段时间点前后各 2 帧的截图路径（时光倒带）
+   */
+  async getTimelapseFrames(segmentId: string, timestamp: number): Promise<string[]> {
+    const db = await getDatabase();
+    // 查询同一天内时间戳前后各 2 帧的截图
+    const segment = await this.getSegmentById(segmentId);
+    if (!segment) return [];
+    const date = segment.date;
+    const rows = queryAll(
+      db,
+      `SELECT screenshot_path FROM segments
+       WHERE date = ? AND is_deleted = 0 AND screenshot_path IS NOT NULL AND screenshot_saved = 1
+       ORDER BY ABS(strftime('%s', start_time) - ?) ASC
+       LIMIT 5`,
+      [date, Math.floor(timestamp / 1000)]
+    );
+    return rows.map((r) => r.screenshot_path).filter(Boolean);
+  }
 }
 
 export const segmentRepo = new SegmentRepository();
