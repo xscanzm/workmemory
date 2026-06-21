@@ -34,6 +34,10 @@ export interface ChatCompletionParams {
   temperature?: number
   /** 最大 token 数 */
   maxTokens?: number
+  /** 响应格式：json_object 或 text */
+  responseFormat?: { type: 'json_object' | 'text' }
+  /** JSON Schema 结构化输出（优先级高于 responseFormat） */
+  jsonSchema?: { name: string; schema: object }
 }
 
 /** token 用量 */
@@ -157,14 +161,29 @@ function createChatCompletionRequest(params: ChatCompletionParams): {
   body: string
   headers: Record<string, string>
 } {
+  const requestBody: Record<string, unknown> = {
+    model: params.model,
+    messages: params.messages,
+    temperature: params.temperature ?? 0.4,
+    max_tokens: params.maxTokens ?? 2048
+  }
+
+  if (params.jsonSchema) {
+    requestBody.response_format = {
+      type: 'json_schema',
+      json_schema: {
+        name: params.jsonSchema.name,
+        schema: params.jsonSchema.schema,
+        strict: true
+      }
+    }
+  } else if (params.responseFormat) {
+    requestBody.response_format = { type: params.responseFormat.type }
+  }
+
   return {
     url: getChatCompletionsUrl(params.baseUrl),
-    body: JSON.stringify({
-      model: params.model,
-      messages: params.messages,
-      temperature: params.temperature ?? 0.4,
-      max_tokens: params.maxTokens ?? 2048
-    }),
+    body: JSON.stringify(requestBody),
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${params.apiKey}`

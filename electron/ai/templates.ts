@@ -34,6 +34,8 @@ export interface ReportTemplateDef {
   systemPrompt: string
   /** 用户提示词模板：含占位符 */
   userPromptTemplate: string
+  /** 是否启用结构化输出（JSON 模式），默认 false；为 true 时调用方会以 json_object 模式请求并渲染为 Markdown */
+  structuredOutput?: boolean
   /** 构建提示词（每个模板独立导出） */
   buildPrompt: (params: TemplateParams) => BuiltPrompt
 }

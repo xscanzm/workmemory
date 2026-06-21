@@ -5,7 +5,7 @@
 import type Database from 'better-sqlite3'
 import { SCHEMA_SQL } from './schema'
 
-const CURRENT_VERSION = 4
+const CURRENT_VERSION = 5
 
 interface Migration {
   version: number
@@ -212,6 +212,20 @@ const migrations: Migration[] = [
       db.exec(FTS5_SCHEMA_SQL)
       db.exec(CLEAN_EPISODES_FTS_SQL)
       db.exec(`INSERT INTO fts_clean_episodes(fts_clean_episodes) VALUES ('rebuild')`)
+    }
+  },
+  {
+    version: 5,
+    description: 'segments 表新增 ocr_raw_text / noise_score 字段（OCR 原始文本与噪声评分，均可空）',
+    up: (db: Database.Database) => {
+      const segmentCols = db.prepare("PRAGMA table_info(segments)").all() as Array<{ name: string }>
+      const addSegmentColumn = (name: string, ddl: string): void => {
+        if (!segmentCols.some((c) => c.name === name)) {
+          db.exec(`ALTER TABLE segments ADD COLUMN ${ddl}`)
+        }
+      }
+      addSegmentColumn('ocr_raw_text', 'ocr_raw_text TEXT')
+      addSegmentColumn('noise_score', 'noise_score REAL')
     }
   }
 ]

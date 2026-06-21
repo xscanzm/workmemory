@@ -118,6 +118,10 @@ export interface WorkSegment {
   activeWindowBounds?: BoundsRect | null
   /** 整屏降级时的屏幕范围 */
   displayBounds?: BoundsRect | null
+  /** OCR 原始文本（未清洗） */
+  ocrRawText?: string
+  /** 噪声评分，用于过滤低质量片段 */
+  noiseScore?: number
 }
 
 /** Episode：语义合并后的工作事件 */

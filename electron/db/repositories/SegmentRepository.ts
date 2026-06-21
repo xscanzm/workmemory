@@ -35,6 +35,8 @@ interface SegmentRow {
   source_quality?: string
   active_window_bounds?: string
   display_bounds?: string
+  ocr_raw_text?: string
+  noise_score?: number
 }
 
 function parseJsonObject<T>(value: string | undefined): T | null {
@@ -74,7 +76,9 @@ function rowToSegment(row: SegmentRow): WorkSegment {
     captureSource: (row.capture_source ?? 'unknown') as CaptureSource,
     sourceQuality: (row.source_quality ?? 'low') as SourceQuality,
     activeWindowBounds: parseJsonObject<BoundsRect>(row.active_window_bounds),
-    displayBounds: parseJsonObject<BoundsRect>(row.display_bounds)
+    displayBounds: parseJsonObject<BoundsRect>(row.display_bounds),
+    ocrRawText: row.ocr_raw_text ?? undefined,
+    noiseScore: row.noise_score ?? undefined
   }
 }
 
@@ -106,6 +110,8 @@ interface SegmentInsertParams {
   source_quality: string
   active_window_bounds: string
   display_bounds: string
+  ocr_raw_text: string | null
+  noise_score: number | null
   created_at: string
   updated_at: string
 }
@@ -147,6 +153,8 @@ function segmentToParams(segment: WorkSegment): SegmentInsertParams {
     ),
     active_window_bounds: stringifyOptionalObject(segment.activeWindowBounds),
     display_bounds: stringifyOptionalObject(segment.displayBounds),
+    ocr_raw_text: segment.ocrRawText ?? null,
+    noise_score: segment.noiseScore ?? null,
     created_at: now,
     updated_at: now
   }
@@ -164,14 +172,14 @@ export const SegmentRepository = {
         is_selected_for_report, is_private, is_important, is_deleted, source_status,
         user_title, user_summary, user_note, tags, ocr_blocks, ocr_confidence,
         capture_source, source_quality, active_window_bounds, display_bounds,
-        created_at, updated_at
+        ocr_raw_text, noise_score, created_at, updated_at
       ) VALUES (
         @id, @date, @start_time, @end_time, @duration_seconds, @app_name, @process_name,
         @window_title, @ocr_text, @ocr_summary, @image_hash, @screenshot_path,
         @is_selected_for_report, @is_private, @is_important, @is_deleted, @source_status,
         @user_title, @user_summary, @user_note, @tags, @ocr_blocks, @ocr_confidence,
         @capture_source, @source_quality, @active_window_bounds, @display_bounds,
-        @created_at, @updated_at
+        @ocr_raw_text, @noise_score, @created_at, @updated_at
       )`
     ).run(params)
     const created = this.getById(id)
@@ -287,7 +295,8 @@ function db_update(params: SegmentInsertParams): void {
       user_note = @user_note, tags = @tags, ocr_blocks = @ocr_blocks,
       ocr_confidence = @ocr_confidence, capture_source = @capture_source,
       source_quality = @source_quality, active_window_bounds = @active_window_bounds,
-      display_bounds = @display_bounds, updated_at = @updated_at
+      display_bounds = @display_bounds, ocr_raw_text = @ocr_raw_text,
+      noise_score = @noise_score, updated_at = @updated_at
     WHERE id = @id`
   ).run(params)
 }

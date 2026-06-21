@@ -34,7 +34,9 @@ CREATE TABLE IF NOT EXISTS segments (
   capture_source          TEXT NOT NULL DEFAULT 'unknown',
   source_quality          TEXT NOT NULL DEFAULT 'low',
   active_window_bounds    TEXT NOT NULL DEFAULT '',
-  display_bounds          TEXT NOT NULL DEFAULT ''
+  display_bounds          TEXT NOT NULL DEFAULT '',
+  ocr_raw_text            TEXT,
+  noise_score             REAL
 );
 CREATE INDEX IF NOT EXISTS idx_segments_date ON segments(date);
 CREATE INDEX IF NOT EXISTS idx_segments_image_hash ON segments(image_hash);

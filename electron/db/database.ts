@@ -54,3 +54,8 @@ export function closeDatabase(): void {
 export function resetDatabaseInstance(): void {
   dbInstance = null
 }
+
+/** 仅供测试/脚本使用：直接注入 Database 实例，跳过 electron app 依赖 */
+export function setDatabaseInstance(db: Database.Database): void {
+  dbInstance = db
+}

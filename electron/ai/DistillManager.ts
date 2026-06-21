@@ -2,7 +2,7 @@
  * DistillManager：整点低频 AI 理解批处理。
  */
 import { randomUUID } from 'node:crypto'
-import type { CleanEpisode, EntityRef, EvidenceRef, MemoryKind, SourceQuality, WikiStatus } from '@/types'
+import type { CleanEpisode, EntityRef, EvidenceRef } from '@/types'
 import { getDatabase } from '../db/database'
 import { SettingsStore } from '../db/SettingsStore'
 import { CleanEpisodeRepository } from '../db/repositories/CleanEpisodeRepository'
@@ -10,6 +10,7 @@ import { OpenAIClient } from './OpenAIClient'
 import { maskSensitive } from './SensitiveMasker'
 import { HourContextPackBuilder } from './HourContextPackBuilder'
 import { DISTILL_VERSION, buildDistillMessages } from './DistillPrompt'
+import { parseDistillResponse, type DistillEvent } from './schemas/DistillEventSchema'
 
 interface DistillRunRow {
   id: string
@@ -24,50 +25,11 @@ interface DistillRunRow {
   updated_at: string
 }
 
-interface RawDistillEvent {
-  title?: unknown
-  summary?: unknown
-  startTime?: unknown
-  endTime?: unknown
-  memoryKind?: unknown
-  project?: unknown
-  entities?: unknown
-  topics?: unknown
-  materials?: unknown
-  outputs?: unknown
-  todos?: unknown
-  blockers?: unknown
-  segmentIds?: unknown
-  evidenceRefs?: unknown
-  sourceQuality?: unknown
-  confidence?: unknown
-  reportEligible?: unknown
-  wikiEligible?: unknown
-  wikiStatus?: unknown
-}
-
-interface RawDistillResponse {
-  events?: unknown
-}
-
 export interface DistillResult {
   created: number
   skipped: boolean
   message: string
 }
-
-const VALID_MEMORY_KINDS = new Set<MemoryKind>([
-  'work',
-  'research',
-  'communication',
-  'coding',
-  'planning',
-  'review',
-  'admin',
-  'idle_uncertain'
-])
-const VALID_SOURCE_QUALITY = new Set<SourceQuality>(['high', 'medium', 'low', 'failed', 'private'])
-const VALID_WIKI_STATUS = new Set<WikiStatus>(['none', 'candidate', 'auto_upserted', 'needs_review', 'rejected'])
 
 function nowIso(): string {
   return new Date().toISOString()
@@ -82,113 +44,79 @@ function jsonArray(value: string): string[] {
   }
 }
 
-function parseJsonFromModel(content: string): RawDistillResponse {
-  const trimmed = content.trim()
-  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/)
-  const jsonText = fenced ? fenced[1].trim() : trimmed
-  return JSON.parse(jsonText) as RawDistillResponse
+function clampConfidence(value: number): number {
+  return Math.max(0, Math.min(1, Math.round(value * 100) / 100))
 }
 
-function stringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) return []
-  return value.filter((v): v is string => typeof v === 'string' && v.trim().length > 0).map((v) => v.trim())
-}
-
-function clampConfidence(value: unknown): number {
-  const n = typeof value === 'number' ? value : 0.5
-  return Math.max(0, Math.min(1, Math.round(n * 100) / 100))
-}
-
-function normalizeEntities(value: unknown): EntityRef[] {
-  if (!Array.isArray(value)) return []
+function normalizeEntities(value: DistillEvent['entities']): EntityRef[] {
   const result: EntityRef[] = []
   for (const item of value) {
-    if (!item || typeof item !== 'object') continue
-    const obj = item as Record<string, unknown>
-    const type = obj.type
-    const name = obj.name
-    if (
-      (type === 'person' || type === 'project' || type === 'document' || type === 'url') &&
-      typeof name === 'string' &&
-      name.trim().length > 0
-    ) {
-      result.push({
-        type,
-        name: name.trim(),
-        value: typeof obj.value === 'string' ? obj.value : undefined,
-        confidence: clampConfidence(obj.confidence)
-      })
-    }
+    const name = item.name.trim()
+    if (name.length === 0) continue
+    result.push({
+      type: item.type,
+      name,
+      value: item.value,
+      confidence: clampConfidence(item.confidence)
+    })
   }
   return result
 }
 
-function normalizeEvidence(value: unknown, allowedSegmentIds: Set<string>): EvidenceRef[] {
-  if (!Array.isArray(value)) return []
+function normalizeEvidence(
+  value: DistillEvent['evidenceRefs'],
+  allowedSegmentIds: Set<string>
+): EvidenceRef[] {
   const result: EvidenceRef[] = []
   for (const item of value) {
-    if (!item || typeof item !== 'object') continue
-    const obj = item as Record<string, unknown>
-    if (typeof obj.segmentId !== 'string' || !allowedSegmentIds.has(obj.segmentId)) continue
+    if (!allowedSegmentIds.has(item.segmentId)) continue
     result.push({
-      segmentId: obj.segmentId,
-      quote: typeof obj.quote === 'string' ? obj.quote.slice(0, 300) : '',
-      reason: typeof obj.reason === 'string' ? obj.reason.slice(0, 160) : ''
+      segmentId: item.segmentId,
+      quote: item.quote.slice(0, 300),
+      reason: item.reason.slice(0, 160)
     })
   }
   return result
 }
 
 function normalizeEvent(
-  raw: RawDistillEvent,
+  raw: DistillEvent,
   date: string,
   hourBucket: string,
   allowedSegmentIds: Set<string>,
   modelName: string
 ): CleanEpisode | null {
-  const title = typeof raw.title === 'string' ? raw.title.trim() : ''
-  const summary = typeof raw.summary === 'string' ? raw.summary.trim() : ''
+  const title = raw.title.trim()
+  const summary = raw.summary.trim()
   if (!title || !summary) return null
 
-  const segmentIds = stringArray(raw.segmentIds).filter((id) => allowedSegmentIds.has(id))
+  const segmentIds = raw.segmentIds.filter((id) => allowedSegmentIds.has(id))
   if (segmentIds.length === 0) return null
-
-  const memoryKind = VALID_MEMORY_KINDS.has(raw.memoryKind as MemoryKind)
-    ? raw.memoryKind as MemoryKind
-    : 'work'
-  const sourceQuality = VALID_SOURCE_QUALITY.has(raw.sourceQuality as SourceQuality)
-    ? raw.sourceQuality as SourceQuality
-    : 'medium'
-  const wikiStatus = VALID_WIKI_STATUS.has(raw.wikiStatus as WikiStatus)
-    ? raw.wikiStatus as WikiStatus
-    : raw.wikiEligible === true
-      ? 'candidate'
-      : 'none'
 
   const ts = nowIso()
   return {
     id: randomUUID(),
     date,
     hourBucket,
-    startTime: typeof raw.startTime === 'string' ? raw.startTime : `${hourBucket.slice(0, 2)}:00:00`,
-    endTime: typeof raw.endTime === 'string' ? raw.endTime : `${hourBucket.slice(0, 2)}:59:59`,
+    startTime: raw.startTime,
+    endTime: raw.endTime,
     title,
     summary,
-    memoryKind,
-    project: typeof raw.project === 'string' ? raw.project.trim() : '',
+    memoryKind: raw.memoryKind,
+    project: raw.project.trim(),
     entities: normalizeEntities(raw.entities),
-    topics: stringArray(raw.topics).slice(0, 12),
-    materials: stringArray(raw.materials).slice(0, 12),
-    outputs: stringArray(raw.outputs).slice(0, 12),
-    todos: stringArray(raw.todos).slice(0, 12),
-    blockers: stringArray(raw.blockers).slice(0, 8),
+    topics: raw.topics.slice(0, 12),
+    materials: raw.materials.slice(0, 12),
+    outputs: raw.outputs.slice(0, 12),
+    todos: raw.todos.slice(0, 12),
+    blockers: raw.blockers.slice(0, 8),
     segmentIds,
     evidenceRefs: normalizeEvidence(raw.evidenceRefs, allowedSegmentIds),
-    sourceQuality,
+    sourceQuality: raw.sourceQuality,
     confidence: clampConfidence(raw.confidence),
-    reportEligible: raw.reportEligible !== false,
-    wikiEligible: raw.wikiEligible === true,
-    wikiStatus,
+    reportEligible: raw.reportEligible,
+    wikiEligible: raw.wikiEligible,
+    wikiStatus: raw.wikiStatus,
     createdAt: ts,
     updatedAt: ts,
     modelName,
@@ -342,28 +270,56 @@ export class DistillManager {
     })
 
     try {
-      const result = await OpenAIClient.chatCompletion({
+      const baseParams = {
         baseUrl: apiConfig.baseUrl,
         apiKey: apiConfig.apiKey,
         model: apiConfig.model,
+        temperature: 0.2,
+        maxTokens: 4096,
+        responseFormat: { type: 'json_object' as const }
+      }
+
+      const result = await OpenAIClient.chatCompletion({
+        ...baseParams,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: masked.text }
-        ],
-        temperature: 0.2,
-        maxTokens: 4096
+        ]
       })
 
-      const parsed = parseJsonFromModel(result.content)
-      if (!Array.isArray(parsed.events)) {
-        throw new Error('AI JSON 缺少 events 数组')
+      let { events, skipped } = parseDistillResponse(result.content)
+
+      if (events.length === 0 && skipped > 0) {
+        const retryText =
+          masked.text +
+          '\n\n上次返回无法解析（' +
+          skipped +
+          ' 条被跳过），请严格输出 JSON 对象，第一个字符必须是 {'
+        const retryResult = await OpenAIClient.chatCompletion({
+          ...baseParams,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: retryText }
+          ]
+        })
+        const retryParsed = parseDistillResponse(retryResult.content)
+        events = retryParsed.events
+        skipped = retryParsed.skipped
       }
+
       const allowedSegmentIds = new Set(pack.segmentIds)
-      const cleanEpisodes = parsed.events
-        .map((event) => normalizeEvent(event as RawDistillEvent, date, hourBucket, allowedSegmentIds, apiConfig.model))
+      const cleanEpisodes = events
+        .map((event) => normalizeEvent(event, date, hourBucket, allowedSegmentIds, apiConfig.model))
         .filter((event): event is CleanEpisode => event !== null)
       if (cleanEpisodes.length === 0) {
-        throw new Error('AI JSON 未产生可写入的工作记忆事件')
+        const errorMessage = `AI JSON 解析失败，跳过 ${skipped} 条`
+        upsertRun(date, hourBucket, {
+          status: 'failed',
+          segmentIds: pack.segmentIds,
+          modelName: apiConfig.model,
+          errorMessage
+        })
+        return { created: 0, skipped: false, message: errorMessage }
       }
 
       CleanEpisodeRepository.deleteByHour(date, hourBucket)

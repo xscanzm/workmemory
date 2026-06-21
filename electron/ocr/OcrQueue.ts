@@ -22,6 +22,7 @@ import { SegmentRepository } from '../db/repositories/SegmentRepository'
 import { Screenshot } from '../capture/Screenshot'
 import type { PpOcrEngine } from './PpOcrEngine'
 import type { OcrResult } from './PpOcrEngine'
+import { getOcrTextCleaner } from './OcrTextCleaner'
 
 /** OcrQueue 配置 */
 export interface OcrQueueConfig {
@@ -41,7 +42,7 @@ const DEFAULT_CONFIG: OcrQueueConfig = {
 }
 
 /** ocr_summary 截断长度 */
-const OCR_SUMMARY_MAX_LENGTH = 100
+const OCR_SUMMARY_MAX_LENGTH = 200
 
 /**
  * OcrQueue：OCR 处理队列。
@@ -224,22 +225,28 @@ export class OcrQueue extends EventEmitter {
 
   /** OCR 成功回调 */
   private onOcrSuccess(segment: WorkSegment, result: OcrResult): void {
-    const trimmedText = result.text.trim()
-    const summary = trimmedText.slice(0, OCR_SUMMARY_MAX_LENGTH)
+    const { cleanedText, noiseScore } = getOcrTextCleaner().clean(result.text)
+    const summary = cleanedText.slice(0, OCR_SUMMARY_MAX_LENGTH)
 
-    // 判断状态：有文本 → ocr_done，无文本 → no_text
-    const sourceStatus = trimmedText.length > 0 ? 'ocr_done' : 'no_text'
+    // 判断状态：清洗后仍有文本 → ocr_done，否则 → no_text
+    const sourceStatus = cleanedText.length > 0 ? 'ocr_done' : 'no_text'
+
+    // 来源质量：噪声评分过高时降级，否则按 OCR 置信度判定
     const sourceQuality =
-      sourceStatus === 'ocr_done'
-        ? result.confidence >= 0.85
-          ? 'high'
-          : result.confidence >= 0.55
+      sourceStatus === 'no_text'
+        ? 'low'
+        : noiseScore > 0.7
+          ? 'low'
+          : noiseScore > 0.4
             ? 'medium'
-            : 'low'
-        : 'low'
+            : result.confidence >= 0.85
+              ? 'high'
+              : result.confidence >= 0.55
+                ? 'medium'
+                : 'low'
 
     SegmentRepository.update(segment.id, {
-      ocrText: trimmedText,
+      ocrText: cleanedText,
       ocrSummary: summary,
       sourceStatus,
       ocrBlocks: result.boxes.map((box) => ({
@@ -248,7 +255,9 @@ export class OcrQueue extends EventEmitter {
         confidence: result.confidence
       })),
       ocrConfidence: result.confidence,
-      sourceQuality
+      sourceQuality,
+      noiseScore,
+      ...(this.config.saveScreenshots ? { ocrRawText: result.text } : {})
     })
 
     // 删除临时截图（若未开启保存）
