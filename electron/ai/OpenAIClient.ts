@@ -84,12 +84,21 @@ function summarizeNonJsonBody(statusCode: number, body: string): string {
 export class OpenAiApiError extends Error {
   readonly statusCode: number
   readonly isRetryable: boolean
+  readonly reasonCode?: 'reasoning_only' | 'length_without_content'
+  readonly reasoningContent?: string
 
-  constructor(message: string, statusCode: number, isRetryable: boolean) {
+  constructor(
+    message: string,
+    statusCode: number,
+    isRetryable: boolean,
+    details?: { reasonCode?: 'reasoning_only' | 'length_without_content'; reasoningContent?: string }
+  ) {
     super(message)
     this.name = 'OpenAiApiError'
     this.statusCode = statusCode
     this.isRetryable = isRetryable
+    this.reasonCode = details?.reasonCode
+    this.reasoningContent = details?.reasoningContent
   }
 }
 
@@ -145,7 +154,11 @@ function httpRequest(
 /** OpenAI API 响应结构（仅取需要的字段） */
 interface OpenAiResponse {
   choices?: Array<{
-    message?: { role?: string; content?: string }
+    message?: {
+      role?: string
+      content?: string
+      reasoning_content?: string
+    }
     finish_reason?: string
   }>
   usage?: {
@@ -154,6 +167,60 @@ interface OpenAiResponse {
     total_tokens?: number
   }
   error?: { message?: string; type?: string; code?: string }
+}
+
+function normalizeAssistantText(value: unknown): string {
+  if (typeof value === 'string') return value.trim()
+  if (Array.isArray(value)) {
+    const joined = value
+      .map((item) => {
+        if (typeof item === 'string') return item
+        if (item && typeof item === 'object') {
+          const obj = item as Record<string, unknown>
+          if (typeof obj.text === 'string') return obj.text
+          if (typeof obj.content === 'string') return obj.content
+        }
+        return ''
+      })
+      .filter((part) => part.length > 0)
+      .join('\n')
+    return joined.trim()
+  }
+  return ''
+}
+
+const REASONING_RETRY_MAX_TOKENS = 8192
+const REASONING_CONTEXT_MAX_CHARS = 6000
+
+function createReasoningFallbackParams(
+  params: ChatCompletionParams,
+  reasoningContent?: string
+): ChatCompletionParams {
+  const retryInstruction = [
+    '上一次模型只返回了 reasoning_content，没有返回 message.content。',
+    '请基于原始任务直接输出最终答案，不要输出思考过程、推理过程或分析草稿。',
+    params.responseFormat?.type === 'json_object' || params.jsonSchema
+      ? '本次必须只输出一个合法 JSON 对象，不要使用 Markdown 代码块。'
+      : '本次只输出可直接给用户使用的最终文本。'
+  ]
+
+  if (reasoningContent) {
+    retryInstruction.push(
+      `上一次 reasoning_content 摘要如下，仅供你提取最终答案，不要复述：\n${reasoningContent.slice(0, REASONING_CONTEXT_MAX_CHARS)}`
+    )
+  }
+
+  return {
+    ...params,
+    maxTokens: Math.max(params.maxTokens ?? 2048, REASONING_RETRY_MAX_TOKENS),
+    messages: [
+      ...params.messages,
+      {
+        role: 'user',
+        content: retryInstruction.join('\n')
+      }
+    ]
+  }
 }
 
 function createChatCompletionRequest(params: ChatCompletionParams): {
@@ -247,8 +314,32 @@ async function doChatCompletionOnce(
 
   // 提取内容
   const choice = data.choices?.[0]
-  const content = choice?.message?.content
+  const content = normalizeAssistantText(choice?.message?.content)
+  const reasoningContent = normalizeAssistantText(choice?.message?.reasoning_content)
+  const finishReason = choice?.finish_reason ?? 'unknown'
+
   if (!content && !options?.allowEmptyContent) {
+    if (finishReason === 'length') {
+      throw new OpenAiApiError(
+        reasoningContent
+          ? 'AI 仅返回了思考内容，最终答案在达到输出上限前未生成。请提高 max tokens，或在提示词里明确“只输出最终答案，不要思考过程”。'
+          : 'AI 在达到输出上限前没有返回最终答案。请提高 max tokens，或在提示词里明确“只输出最终答案，不要思考过程”。',
+        statusCode,
+        false,
+        {
+          reasonCode: reasoningContent ? 'reasoning_only' : 'length_without_content',
+          reasoningContent
+        }
+      )
+    }
+    if (reasoningContent) {
+      throw new OpenAiApiError(
+        'AI 接口未返回最终答案，只返回了 reasoning_content。当前兼容接口需要模型把结果写入 message.content，请在提示词中明确“只输出最终答案，不要思考过程”。',
+        statusCode,
+        false,
+        { reasonCode: 'reasoning_only', reasoningContent }
+      )
+    }
     throw new OpenAiApiError('AI 接口返回内容为空', statusCode, false)
   }
 
@@ -259,9 +350,9 @@ async function doChatCompletionOnce(
   }
 
   return {
-    content: (content ?? '').trim(),
+    content,
     usage,
-    finishReason: choice?.finish_reason ?? 'unknown'
+    finishReason
   }
 }
 
@@ -290,19 +381,36 @@ export const OpenAIClient = {
     }
 
     let lastError: Error | null = null
+    let triedReasoningFallback = false
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       try {
         return await doChatCompletionOnce(params)
       } catch (e) {
-        lastError = e instanceof Error ? e : new Error(String(e))
-        if (e instanceof OpenAiApiError && e.isRetryable && attempt < MAX_RETRIES) {
+        let caught = e instanceof Error ? e : new Error(String(e))
+        if (
+          caught instanceof OpenAiApiError &&
+          !triedReasoningFallback &&
+          (caught.reasonCode === 'reasoning_only' || caught.reasonCode === 'length_without_content')
+        ) {
+          triedReasoningFallback = true
+          try {
+            return await doChatCompletionOnce(
+              createReasoningFallbackParams(params, caught.reasoningContent)
+            )
+          } catch (retryError) {
+            caught = retryError instanceof Error ? retryError : new Error(String(retryError))
+          }
+        }
+
+        lastError = caught
+        if (caught instanceof OpenAiApiError && caught.isRetryable && attempt < MAX_RETRIES) {
           // 指数退避：1s, 2s
           const delay = RETRY_BASE_DELAY_MS * Math.pow(2, attempt)
           await sleep(delay)
           continue
         }
         // 不可重试或重试耗尽，抛出
-        throw e
+        throw caught
       }
     }
     // 理论上不会到达

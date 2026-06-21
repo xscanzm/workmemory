@@ -151,6 +151,26 @@ export class CaptureDecision extends EventEmitter {
   }
 
   /**
+   * 外部活动唤醒。
+   * 用于系统检测到用户重新活跃时，将 idle 恢复为 recording，
+   * 并基于当前活动窗口重新走一遍常规捕获节流链路。
+   */
+  wakeFromActivity(info?: WindowInfo | null): void {
+    if (this.state === 'paused') return
+
+    this.resetIdleTimer()
+
+    if (this.state === 'idle') {
+      this.state = 'recording'
+      this.emit('state-change', { state: this.state })
+    }
+
+    if (info) {
+      this.handleEvent(info)
+    }
+  }
+
+  /**
    * 设置是否允许整屏降级（由 CaptureManager 同步自 SettingsStore.allowFullScreenshotFallback）。
    * 默认 false：窗口截图失败即跳过，绝不自动整屏。
    */
@@ -221,9 +241,10 @@ export class CaptureDecision extends EventEmitter {
   private resetIdleTimer(): void {
     if (this.idleTimer) clearTimeout(this.idleTimer)
     this.idleTimer = setTimeout(() => {
-      // 3 分钟无事件，标记 idle
+      // 3 分钟无事件，标记 idle。保留当前片段上下文，避免短暂无窗口事件后恢复时断段。
       this.state = 'idle'
-      this.resetCurrentSegment()
+      this.pendingWindowInfo = null
+      this.clearDebounceTimer()
       this.emit('state-change', { state: this.state })
       this.idleTimer = null
     }, IDLE_MS)

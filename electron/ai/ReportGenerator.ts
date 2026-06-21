@@ -40,7 +40,7 @@ import {
   DEFAULT_STRUCTURED_SECTIONS,
   REPORT_SECTION_TITLES
 } from './templates'
-import { OpenAIClient } from './OpenAIClient'
+import { OpenAIClient, OpenAiApiError } from './OpenAIClient'
 import type { ChatCompletionParams, TokenUsage } from './OpenAIClient'
 import { maskSensitive } from './SensitiveMasker'
 import { filterHighConfidenceEntities } from '@/utils/entity'
@@ -410,6 +410,74 @@ function renderStructuredToMarkdown(data: {
     parts.push(`> ${data.summary}`)
   }
   return parts.join('\n\n')
+}
+
+function getAiFailureWarning(error: unknown): string {
+  if (error instanceof OpenAiApiError) {
+    if (error.statusCode === 401) {
+      return error.message
+    }
+    if (
+      error.reasonCode === 'reasoning_only' ||
+      error.reasonCode === 'length_without_content'
+    ) {
+      return 'AI 未返回最终答案，已使用勾选片段在本地生成客观日报草稿'
+    }
+    return `AI 生成失败：${error.message}，已使用勾选片段在本地生成客观日报草稿`
+  }
+  return `AI 生成失败：${error instanceof Error ? error.message : String(error)}，已使用勾选片段在本地生成客观日报草稿`
+}
+
+function renderRuleBasedSnapshotReport(
+  payload: GenerateReportPayload,
+  snapshot: ReportInputSnapshot,
+  projectTags: string[]
+): string {
+  const lines: string[] = [`# 工作日报 ${payload.date}`]
+  const selectedItems = snapshot.items
+
+  if (payload.notes || snapshot.userNotes) {
+    lines.push(`## 用户备注\n\n${payload.notes || snapshot.userNotes}`)
+  }
+
+  const summaries = selectedItems
+    .map((item) => item.summary || item.title)
+    .filter((text) => text && text.trim().length > 0)
+    .slice(0, 12)
+
+  if (summaries.length > 0) {
+    lines.push(`## 今日概览\n\n${summaries.map((item) => `- ${item}`).join('\n')}`)
+  }
+
+  if (projectTags.length > 0) {
+    lines.push(`## 相关主题\n\n${projectTags.slice(0, 20).map((tag) => `- ${tag}`).join('\n')}`)
+  }
+
+  const timeline = selectedItems
+    .map((item) => {
+      const details: string[] = [`- **${item.startTime} - ${item.endTime}** ${item.title}`]
+      if (item.summary) details.push(`  - 摘要：${item.summary}`)
+      if (item.project) details.push(`  - 项目：${item.project}`)
+      if (item.topics.length > 0) details.push(`  - 主题：${item.topics.slice(0, 5).join('、')}`)
+      return details.join('\n')
+    })
+    .join('\n')
+
+  if (timeline) {
+    lines.push(`## 时间线\n\n${timeline}`)
+  }
+
+  const evidence = selectedItems
+    .flatMap((item) => item.evidenceRefs.map((ref) => ref.quote))
+    .filter((quote) => quote && quote.trim().length > 0)
+    .slice(0, 20)
+
+  if (evidence.length > 0) {
+    lines.push(`## 证据片段\n\n${evidence.map((quote) => `- ${quote}`).join('\n')}`)
+  }
+
+  lines.push('## 说明\n\n本日报由本地规则基于勾选片段生成，未使用截图内容。')
+  return lines.join('\n\n')
 }
 
 /** 计算字符串字符数（供前端确认面板显示） */
@@ -1231,12 +1299,20 @@ export const ReportGenerator = {
     if (template.structuredOutput === true) {
       chatParams.responseFormat = { type: 'json_object' }
     }
-    const result = await OpenAIClient.chatCompletion(chatParams)
+    let result: Awaited<ReturnType<typeof OpenAIClient.chatCompletion>> | null = null
+    let aiWarningText = ''
+    try {
+      result = await OpenAIClient.chatCompletion(chatParams)
+    } catch (e) {
+      aiWarningText = getAiFailureWarning(e)
+    }
 
     // B5：结构化输出路径——尝试解析 JSON 并渲染为 Markdown；解析失败则回退到原始输出
     // 注意：'structured' 模板（RP1）在上方已提前 return，不会进入此处
-    let content = result.content
-    if (template.structuredOutput === true) {
+    let content = result
+      ? result.content
+      : renderRuleBasedSnapshotReport(payload, snapshot, projectTags)
+    if (result && template.structuredOutput === true) {
       try {
         const structured = JSON.parse(result.content) as LegacyStructuredOutput
         content = renderStructuredToMarkdown({
@@ -1262,24 +1338,28 @@ export const ReportGenerator = {
     // - builtFromEpisodes（raw_fallback 路径）：追加小时级理解未就绪提示，并附带 distill 失败原因
     // - 其他 raw_fallback 快照（UI 传入）：保留原有降级提示
     let markdownWarning = ''
-    let warningText = ''
+    let warningText = aiWarningText
     if (builtFromEpisodes) {
       const failureReason = getDistillFailureReason(payload.date)
       const reason =
         failureReason && failureReason.length > 0 ? failureReason : '小时级理解尚未运行'
-      warningText = `小时级理解未就绪：${reason}，当前使用工作记忆事件降级生成`
+      warningText = [warningText, `小时级理解未就绪：${reason}，当前使用工作记忆事件降级生成`]
+        .filter(Boolean)
+        .join('；')
       markdownWarning = `\n\n---\n\n⚠️ 注意：${warningText}`
     } else if (snapshot.sourceType === 'raw_fallback') {
-      markdownWarning =
-        '\n\n---\n\n⚠️ 注意：本日报使用原始/启发式片段降级生成，建议在小时级理解完成后重新生成。'
-      warningText = '使用原始/启发式片段降级生成'
+      const rawFallbackWarning = '使用原始/启发式片段降级生成'
+      warningText = [warningText, rawFallbackWarning].filter(Boolean).join('；')
+      markdownWarning = `\n\n---\n\n⚠️ 注意：${warningText || '本日报使用原始/启发式片段降级生成，建议在小时级理解完成后重新生成。'}`
+    } else if (warningText) {
+      markdownWarning = `\n\n---\n\n⚠️ 注意：${warningText}`
     }
 
     return {
       markdown: `${content}${markdownWarning}`,
       aiInputSnapshot,
       segmentIds,
-      usage: result.usage,
+      usage: result?.usage ?? { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
       warning: warningText,
       maskedCount: maskedCount + snapshot.maskedCount
     }
