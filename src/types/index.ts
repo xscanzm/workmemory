@@ -362,3 +362,32 @@ export const defaultAppSettings: AppSettings = {
   aiDistillLastRunAt: '',
   aiDistillSendScreenshots: false
 }
+
+/**
+ * 用户活动类型（由 ActivityClassifier 基于 appName/windowTitle/ocrText 推断）。
+ * idle 为置信度不足时的默认兜底值。
+ */
+export type ActivityType =
+  | 'coding'
+  | 'writing'
+  | 'reading'
+  | 'browsing'
+  | 'chatting'
+  | 'designing'
+  | 'meeting'
+  | 'managing'
+  | 'idle'
+
+/**
+ * 屏幕内容类型（由 ContentClassifier 基于 appName/windowTitle/ocrText 推断）。
+ * other 为置信度不足时的默认兜底值。
+ */
+export type ContentType =
+  | 'chat'
+  | 'webpage'
+  | 'document'
+  | 'code'
+  | 'video'
+  | 'forum'
+  | 'product'
+  | 'other'
