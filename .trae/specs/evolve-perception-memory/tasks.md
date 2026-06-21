@@ -60,11 +60,11 @@
   - [ ] P6.4 修改 `electron/db/repositories/SegmentRepository.ts`：`SegmentRow`/`rowToSegment`/`SegmentInsertParams`/`segmentToParams`/INSERT/UPDATE SQL 映射新字段
   - [ ] P6.5 验证：typecheck 通过；迁移成功；新字段可读写
 
-- [ ] Task P7：OcrQueue 集成感知增强分类器
-  - [ ] P7.1 修改 `electron/ocr/OcrQueue.ts` `onOcrSuccess`：OCR 清洗后，依次调用 `ActivityClassifier.classifyActivity`、`ContentClassifier.classifyContent`、`LayoutAnalyzer.analyzeLayout`（基于 ocrBlocks）、`BrowserContextCollector.collectBrowserUrl`
-  - [ ] P7.2 `ActionFlowInferrer.inferActionFlow` 需要前一个 segment，OcrQueue 维护 `lastSegment` 引用（按窗口/时间）
-  - [ ] P7.3 新字段写入 segment 更新：activityType、contentType、contentData（JSON 序列化）、browserUrl、layoutType、actionFlow
-  - [ ] P7.4 验证：构造含代码/聊天/网页 OCR 的 segment，确认分类结果正确写入
+- [x] Task P7：OcrQueue 集成感知增强分类器
+  - [x] P7.1 修改 `electron/ocr/OcrQueue.ts` `onOcrSuccess`：OCR 清洗后，依次调用 `ActivityClassifier.classifyActivity`、`ContentClassifier.classifyContent`、`LayoutAnalyzer.analyzeLayout`（基于 ocrBlocks）、`BrowserContextCollector.collectBrowserUrl`
+  - [x] P7.2 `ActionFlowInferrer.inferActionFlow` 需要前一个 segment，OcrQueue 维护 `lastSegment` 引用（按窗口/时间）
+  - [x] P7.3 新字段写入 segment 更新：activityType、contentType、contentData（JSON 序列化）、browserUrl、layoutType、actionFlow
+  - [x] P7.4 验证：构造含代码/聊天/网页 OCR 的 segment，确认分类结果正确写入
 
 - [ ] Task P8：EpisodeBuilder activityType 感知聚类
   - [ ] P8.1 修改 `electron/capture/EpisodeBuilder.ts` `isSemanticallySimilar`：新增 activityType 感知——不同 activityType（如 reading vs coding）即使关键词重叠也不合并
@@ -101,13 +101,13 @@
   - [ ] M4.3 批量补建：新增 `rebuildEmbeddings(dateRange)` 方法，为历史 MemCell 补建 embedding
   - [ ] M4.4 验证：DistillManager 成功后 embeddings 表有对应记录
 
-- [ ] Task M5：SemanticSearchRepository 混合检索
-  - [ ] M5.1 新增 `electron/db/repositories/SemanticSearchRepository.ts`：导出 `hybridSearch(query: string, options: { limit, semanticWeight, keywordWeight }): SearchResult[]`
-  - [ ] M5.2 混合检索逻辑：FTS5 关键词匹配（已有）+ 语义向量余弦相似度（EmbeddingService.embed(query) → EmbeddingRepository.searchBySimilarity），按 `score = keywordWeight * ftsScore + semanticWeight * semanticScore` 排序
-  - [ ] M5.3 去重：同一 memory_cell_id 合并，取最高分
-  - [ ] M5.4 降级：EmbeddingService 不可用时退化为纯 FTS5
-  - [ ] M5.5 修改 `src/pages/Search.tsx`：搜索结果展示匹配原因（关键词匹配 / 语义相似 / 混合）
-  - [ ] M5.6 验证：构造"前端组件开发"查询，确认返回"UI 组件库实现"MemCell（语义匹配）
+- [x] Task M5：SemanticSearchRepository 混合检索
+  - [x] M5.1 新增 `electron/db/repositories/SemanticSearchRepository.ts`：导出 `hybridSearch(query: string, options: { limit, semanticWeight, keywordWeight }): SearchResult[]`
+  - [x] M5.2 混合检索逻辑：FTS5 关键词匹配（已有）+ 语义向量余弦相似度（EmbeddingService.embed(query) → EmbeddingRepository.searchBySimilarity），按 `score = keywordWeight * ftsScore + semanticWeight * semanticScore` 排序
+  - [x] M5.3 去重：同一 memory_cell_id 合并，取最高分
+  - [x] M5.4 降级：EmbeddingService 不可用时退化为纯 FTS5
+  - [x] M5.5 修改 `src/pages/Search.tsx`：搜索结果展示匹配原因（关键词匹配 / 语义相似 / 混合）
+  - [x] M5.6 验证：构造"前端组件开发"查询，确认返回"UI 组件库实现"MemCell（语义匹配）
 
 - [ ] Task M6：MemSceneClusterer 主题自组织聚类
   - [ ] M6.1 新增 `electron/memory/MemSceneClusterer.ts`：导出 `clusterMemCell(memCell: MemCell): Promise<{ sceneId: string; isNew: boolean }>`，增量聚类
@@ -192,28 +192,28 @@
 
 ## Phase 5：日报结构化升级
 
-- [ ] Task RP1：ReportGenerator 结构化日报
-  - [ ] RP1.1 修改 `electron/ai/templates.ts` `ReportTemplateDef`：新增 `structuredSections?: ReportSection[]` 配置，控制输出哪些分类要点
-  - [ ] RP1.2 默认 sections：`['butler_summary', 'what_i_did', 'what_i_saw', 'themes', 'timeline', 'chat_notes', 'web_notes', 'forum_notes', 'video_notes', 'product_notes', 'evidence', 'suggestions']`
-  - [ ] RP1.3 修改 `electron/ai/ReportGenerator.ts`：日报输入增加 MemCell + MemScene + causal_chains 上下文；提示词要求按 sections 结构输出
-  - [ ] RP1.4 分类要点生成：基于 segment.contentType 分组（chat→chat_notes, webpage→web_notes, video→video_notes, forum→forum_notes, product→product_notes），每组提取结构化摘要
-  - [ ] RP1.5 证据片段：从 MemCell.facts + segment.ocrText 提取，每条 ≤80 字
-  - [ ] RP1.6 优化建议：从 ReflectionEngine 当周报告提取（若有），否则 AI 生成
-  - [ ] RP1.7 修改 `src/pages/Reports.tsx`：渲染结构化日报，按 sections 分区展示
-  - [ ] RP1.8 验证：构造含聊天/网页/视频活动的一天，确认日报含对应分类要点章节
+- [x] Task RP1：ReportGenerator 结构化日报
+  - [x] RP1.1 修改 `electron/ai/templates.ts` `ReportTemplateDef`：新增 `structuredSections?: ReportSection[]` 配置，控制输出哪些分类要点
+  - [x] RP1.2 默认 sections：`['butler_summary', 'what_i_did', 'what_i_saw', 'themes', 'timeline', 'chat_notes', 'web_notes', 'forum_notes', 'video_notes', 'product_notes', 'evidence', 'suggestions']`
+  - [x] RP1.3 修改 `electron/ai/ReportGenerator.ts`：日报输入增加 MemCell + MemScene + causal_chains 上下文；提示词要求按 sections 结构输出
+  - [x] RP1.4 分类要点生成：基于 segment.contentType 分组（chat→chat_notes, webpage→web_notes, video→video_notes, forum→forum_notes, product→product_notes），每组提取结构化摘要
+  - [x] RP1.5 证据片段：从 MemCell.facts + segment.ocrText 提取，每条 ≤80 字
+  - [x] RP1.6 优化建议：从 ReflectionEngine 当周报告提取（若有），否则 AI 生成
+  - [x] RP1.7 修改 `src/pages/Reports.tsx`：渲染结构化日报，按 sections 分区展示
+  - [x] RP1.8 验证：构造含聊天/网页/视频活动的一天，确认日报含对应分类要点章节
 
 ## Phase 6：验证
 
-- [ ] Task V1：端到端验证脚本
-  - [ ] V1.1 新增 `scripts/verify-perception-memory.ts`：构造 1 天多类型活动 segments（编码/聊天/浏览/视频/论坛）
-  - [ ] V1.2 跑 ActivityClassifier + ContentClassifier + LayoutAnalyzer → 断言分类正确
-  - [ ] V1.3 跑 EpisodeBuilder → 断言不同 activityType 不被误合并
-  - [ ] V1.4 mock OpenAIClient → 跑 DistillManager → 断言 MemCell 写入（含 episode/facts/foresight）
-  - [ ] V1.5 跑 EmbeddingService → 断言向量生成；跑 SemanticSearchRepository → 断言语义检索返回概念相似结果
-  - [ ] V1.6 跑 MemSceneClusterer → 断言同主题归并、不同主题新建
-  - [ ] V1.7 跑 DailyDistillManager → 断言日级摘要含跨小时主题
-  - [ ] V1.8 跑 ReportGenerator → 断言日报含分类要点章节 + 证据片段
-  - [ ] V1.9 脚本可通过 `npx tsx scripts/verify-perception-memory.ts` 运行
+- [x] Task V1：端到端验证脚本
+  - [x] V1.1 新增 `scripts/verify-perception-memory.ts`：构造 1 天多类型活动 segments（编码/聊天/浏览/视频/论坛）
+  - [x] V1.2 跑 ActivityClassifier + ContentClassifier + LayoutAnalyzer → 断言分类正确
+  - [x] V1.3 跑 EpisodeBuilder → 断言不同 activityType 不被误合并
+  - [x] V1.4 mock OpenAIClient → 跑 DistillManager → 断言 MemCell 写入（含 episode/facts/foresight）
+  - [x] V1.5 跑 EmbeddingService → 断言向量生成；跑 SemanticSearchRepository → 断言语义检索返回概念相似结果
+  - [x] V1.6 跑 MemSceneClusterer → 断言同主题归并、不同主题新建
+  - [x] V1.7 跑 DailyDistillManager → 断言日级摘要含跨小时主题
+  - [x] V1.8 跑 ReportGenerator → 断言日报含分类要点章节 + 证据片段
+  - [x] V1.9 脚本可通过 `npx tsx scripts/verify-perception-memory.ts` 运行
 
 - [ ] Task V2：构建与类型验证
   - [ ] V2.1 `npm run typecheck` 零错误

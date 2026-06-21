@@ -13,7 +13,13 @@ export function buildDistillMessages(pack: HourContextPack): {
     '只输出严格 JSON，不要 Markdown，不要解释。',
     '只输出 JSON 对象，不要 Markdown 代码块，不要任何解释文字，第一个字符必须是 {',
     '如果证据不足，使用 idle_uncertain，并降低 confidence。',
-    'Wiki 候选必须有明确标题，禁止“推进”“梳理”“配置”“笔记”这类空洞标题单独成页。'
+    'Wiki 候选必须有明确标题，禁止“推进”“梳理”“配置”“笔记”这类空洞标题单独成页。',
+    '',
+    '除 events 外，每个事件还需输出 MemCell 结构化记忆单元，包含三部分：',
+    '- episode：第三人称叙事，1-2 句客观描述用户做了什么，如 "用户在 VS Code 中实现了 API Key 加密功能，使用了 Electron 的 safeStorage API"。',
+    '- facts：原子事实数组，3-5 条，每条一个独立事实，如 ["使用了 safeStorage API", "密钥存储在 userData 目录", "加密失败时降级到明文"]。',
+    '- foresight：预见数组，0-2 条，每条带 statement（前瞻性陈述）、validFrom（生效日期 YYYY-MM-DD）、validTo（失效日期 YYYY-MM-DD）、confidence（0-1），如 {"statement":"未来涉及密钥存储时可复用 safeStorage 方案","validFrom":"2026-03-29","validTo":"2027-03-29","confidence":0.8}。',
+    'episode/facts/foresight 应基于本小时证据提炼，不要虚构；foresight 仅在有充分依据时输出，否则留空数组。'
   ].join('\n')
 
   const userPrompt = [
@@ -45,7 +51,12 @@ export function buildDistillMessages(pack: HourContextPack): {
       "confidence": 0.0, // confidence 0-1
       "reportEligible": true,
       "wikiEligible": false,
-      "wikiStatus": "none|candidate"
+      "wikiStatus": "none|candidate",
+      "episode": "第三人称叙事，1-2 句客观描述用户做了什么",
+      "facts": ["原子事实1", "原子事实2", "原子事实3"],
+      "foresight": [
+        {"statement": "前瞻性陈述", "validFrom": "YYYY-MM-DD", "validTo": "YYYY-MM-DD", "confidence": 0.8}
+      ]
     }
   ]
 }`

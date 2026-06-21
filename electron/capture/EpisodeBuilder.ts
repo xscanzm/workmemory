@@ -17,7 +17,7 @@
  */
 import { EventEmitter } from 'node:events'
 import { randomUUID } from 'node:crypto'
-import type { Episode, WorkSegment } from '@/types'
+import type { Episode, WorkSegment, ActivityType } from '@/types'
 import { SegmentRepository } from '../db/repositories/SegmentRepository'
 import { EpisodeRepository } from '../db/repositories/EpisodeRepository'
 import {
@@ -263,6 +263,13 @@ export class EpisodeBuilder extends EventEmitter {
 
   /** 判断两个 Cluster 是否语义相似 */
   private isSemanticallySimilar(a: SegmentCluster, b: SegmentCluster): boolean {
+    // activityType 感知：两个聚类都有非 idle 的主导 activityType 且不同 → 不合并
+    // （如 reading 代码文档 vs coding 写代码，即使关键词重叠也不误合并）
+    // 其中一方为 undefined 或 idle 时，向后兼容，不影响现有判断
+    const activityA = this.getDominantActivityType(a)
+    const activityB = this.getDominantActivityType(b)
+    if (activityA && activityB && activityA !== activityB) return false
+
     // 共享任务单号 → 相似
     for (const taskId of a.taskIds) {
       if (b.taskIds.has(taskId)) return true
@@ -289,6 +296,32 @@ export class EpisodeBuilder extends EventEmitter {
     for (const a of source.apps) target.apps.add(a)
   }
 
+  /**
+   * 计算聚类的主导 activityType。
+   * 多数投票：忽略 undefined 和 'idle'，取出现次数最多的 activityType；
+   * 若全部为 undefined/idle，则返回 undefined。
+   */
+  private getDominantActivityType(cluster: SegmentCluster): ActivityType | undefined {
+    const counts = new Map<ActivityType, number>()
+    for (const segment of cluster.segments) {
+      const at = segment.activityType
+      if (at && at !== 'idle') {
+        counts.set(at, (counts.get(at) ?? 0) + 1)
+      }
+    }
+    if (counts.size === 0) return undefined
+
+    let best: ActivityType | undefined
+    let bestCount = 0
+    for (const [at, count] of counts) {
+      if (count > bestCount) {
+        best = at
+        bestCount = count
+      }
+    }
+    return best
+  }
+
   // ===================== Episode 生成 =====================
 
   /** 从 Cluster 创建 Episode */
@@ -307,6 +340,9 @@ export class EpisodeBuilder extends EventEmitter {
     // 生成 one_line_summary
     const oneLineSummary = this.generateOneLineSummary(cluster)
 
+    // 聚类内多数 segment 的 activityType（忽略 undefined/idle）
+    const dominantActivityType = this.getDominantActivityType(cluster)
+
     return {
       id: randomUUID(),
       date,
@@ -319,7 +355,8 @@ export class EpisodeBuilder extends EventEmitter {
       topics,
       userEdited: false,
       reportEligible: true,
-      wikiEligible: false
+      wikiEligible: false,
+      dominantActivityType
     }
   }
 

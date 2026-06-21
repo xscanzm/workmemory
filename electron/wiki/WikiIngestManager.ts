@@ -24,6 +24,7 @@ import type { IngestCandidate } from './HighValueSignalDetector'
 import type { WikiExtractionResult } from './WikiExtractor'
 import { WikiLinkEngine, getWikiLinkEngine } from './WikiLinkEngine'
 import type { BrokenLink } from './WikiLinkEngine'
+import { recordFeedback } from '../ai/FeedbackLoop'
 
 /** 扫描窗口（天）：最近 7 天 */
 const SCAN_WINDOW_DAYS = 7
@@ -247,10 +248,20 @@ export class WikiIngestManager {
 
   /**
    * 拒绝 Ingest：用户忽略 → 从 Review Queue 删除。
+   * 同时记录反馈事件（wiki_rejected），供 FeedbackLoop 分析拒绝模式。
    */
   rejectIngest(reviewItemId: string): boolean {
     const existing = WikiRepository.getById(reviewItemId)
     if (!existing) return false
+
+    // 记录用户拒绝反馈：before 为 Wiki 标题，after 为空（表示整体拒绝）
+    recordFeedback({
+      type: 'wiki_rejected',
+      targetId: reviewItemId,
+      before: existing.title,
+      after: '',
+      timestamp: new Date().toISOString()
+    })
 
     // 清理缓存
     const candidateId = this.extractCandidateId(existing.sources)

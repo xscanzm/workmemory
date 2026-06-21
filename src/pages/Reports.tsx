@@ -54,16 +54,85 @@ import './Reports.css'
 
 const DAILY_SUMMARY_TOPIC = '__daily_summary__'
 
+/** 判断当前日报是否为结构化分区版（RP1.7） */
+function isStructuredReport(report: Report): boolean {
+  return report.templateId === 'structured'
+}
+
+/** 解析结构化日报 Markdown 为分区数组（RP1.7） */
+interface ParsedSection {
+  heading: string
+  body: string
+}
+
+function parseStructuredSections(markdown: string): ParsedSection[] {
+  const lines = markdown.split('\n')
+  const sections: ParsedSection[] = []
+  let currentHeading = ''
+  let currentBody: string[] = []
+
+  for (const line of lines) {
+    const headingMatch = line.match(/^##\s+(.+)$/)
+    if (headingMatch) {
+      if (currentHeading) {
+        sections.push({ heading: currentHeading, body: currentBody.join('\n').trim() })
+      }
+      currentHeading = headingMatch[1].trim()
+      currentBody = []
+    } else if (currentHeading) {
+      // 跳过一级标题（# 工作日报）
+      if (!line.startsWith('# ')) {
+        currentBody.push(line)
+      }
+    }
+  }
+  if (currentHeading) {
+    sections.push({ heading: currentHeading, body: currentBody.join('\n').trim() })
+  }
+  return sections
+}
+
+/**
+ * 渲染结构化日报预览（RP1.7）。
+ * 按 sections 分区展示，每个 section 有标题和内容卡片。
+ */
+function renderStructuredPreview(markdown: string): JSX.Element {
+  const sections = parseStructuredSections(markdown)
+  // 提取一级标题（# 工作日报 YYYY-MM-DD）
+  const titleMatch = markdown.match(/^#\s+(.+)$/m)
+  const reportTitle = titleMatch ? titleMatch[1].trim() : '工作日报'
+
+  return (
+    <div className="wm-reports-structured">
+      <h1 className="wm-reports-structured-title">{reportTitle}</h1>
+      {sections.length === 0 ? (
+        <div className="wm-reports-preview-empty">暂无结构化分区内容</div>
+      ) : (
+        sections.map((section, idx) => (
+          <div key={`${section.heading}-${idx}`} className="wm-reports-structured-section">
+            <h2 className="wm-reports-structured-section-heading">{section.heading}</h2>
+            <div className="wm-reports-structured-section-body">
+              {renderMarkdown(section.body || '（无内容）')}
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  )
+}
+
 const TEMPLATE_OPTIONS: Array<{ id: ReportTemplate; name: string; description: string }> = [
   { id: 'enhanced', name: '汇报优化版', description: '将杂事改写为具商业价值的表达，突出产出与价值' },
   { id: 'concise', name: '简洁客观版', description: '项目/用时/产出列表，客观陈述事实' },
-  { id: 'okr', name: 'OKR 对齐版', description: '按 OKR 进度归纳，对齐目标推进' }
+  { id: 'okr', name: 'OKR 对齐版', description: '按 OKR 进度归纳，对齐目标推进' },
+  { id: 'structured', name: '结构化分区版', description: '按管家总结/今日做了什么/今日看了什么/主题归纳/时间线/分类要点/证据/建议分区输出' }
 ]
 
 const TEMPLATE_NAME_MAP: Record<ReportTemplate, string> = {
   enhanced: '汇报优化版',
   concise: '简洁客观版',
-  okr: 'OKR 对齐版'
+  okr: 'OKR 对齐版',
+  structured: '结构化分区版'
 }
 
 const STATUS_LABEL: Record<ReportStatus, string> = {
@@ -714,7 +783,9 @@ export function Reports(): JSX.Element {
             ) : (
               <div className="wm-reports-preview-pane wm-scroll">
                 {draft.markdownContent.trim()
-                  ? renderMarkdown(draft.markdownContent)
+                  ? (isStructuredReport(draft)
+                      ? renderStructuredPreview(draft.markdownContent)
+                      : renderMarkdown(draft.markdownContent))
                   : <div className="wm-reports-preview-empty">实时预览将在此显示</div>}
               </div>
             )}

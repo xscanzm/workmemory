@@ -217,7 +217,8 @@ export const InsightsChannels = {
 
 /** FTS5 全文搜索通道 */
 export const SearchChannels = {
-  Fts: 'search:fts'
+  Fts: 'search:fts',
+  Hybrid: 'search:hybrid'
 } as const
 
 /* ===================== preload 暴露的 API 契约 ===================== */
@@ -638,9 +639,51 @@ export interface FtsSearchResult {
   wikis: FtsWikiMatch[]
 }
 
+/** 混合检索匹配类型 */
+export type HybridMatchType = 'keyword' | 'semantic' | 'hybrid'
+
+/** 混合检索选项（渲染进程 → 主进程） */
+export interface HybridSearchOptions {
+  limit?: number
+  keywordWeight?: number
+  semanticWeight?: number
+}
+
+/** 混合检索单条结果（主进程 → 渲染进程） */
+export interface HybridSearchResult {
+  memCellId: string
+  score: number
+  matchType: HybridMatchType
+  keywordScore?: number
+  semanticScore?: number
+  memCell?: {
+    id: string
+    cleanEpisodeId: string
+    episode: string
+    facts: string[]
+    foresight: Array<{
+      statement: string
+      validFrom: string
+      validTo: string
+      confidence: number
+    }>
+    metadata: {
+      segmentIds: string[]
+      timestamp: string
+      confidence: number
+      activityType?: string
+      contentType?: string
+    }
+    createdAt: string
+  }
+  snippet?: string
+}
+
 export interface SearchApi {
   /** FTS5 全文搜索：返回 segments/episodes/wikis 三类匹配 + snippet */
   fts(query: string): Promise<FtsSearchResult>
+  /** 混合检索：FTS5 关键词 + 语义向量，返回 MemCell 匹配结果 + matchType */
+  hybrid(query: string, options?: HybridSearchOptions): Promise<HybridSearchResult[]>
 }
 
 /** 渲染进程通过 window.workmemory 访问的完整 API */

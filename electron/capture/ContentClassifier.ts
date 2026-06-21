@@ -340,7 +340,7 @@ function extractWebpageData(
   }
 
   // 解析页面标题：去除浏览器后缀和 URL
-  let pageTitle = windowTitle
+  const pageTitle = windowTitle
     .replace(BROWSER_TITLE_SUFFIX_REGEX, '')
     .replace(/https?:\/\/[^\s]+/i, '')
     .replace(/\s*-\s*$/, '')
@@ -434,7 +434,7 @@ function extractForumData(
   const text = ocrText.trim().length > 0 ? ocrText : blocks.map(b => b.text).join('\n')
 
   // 帖子标题：去除论坛名后缀
-  let threadTitle = windowTitle
+  const threadTitle = windowTitle
     .replace(/ - (reddit|v2ex|掘金|知乎|贴吧|hacker news|lobsters|discourse)\s*$/i, '')
     .replace(/\s*[|｜]\s*(reddit|v2ex|掘金|知乎|贴吧).*$/i, '')
     .trim()
@@ -480,7 +480,7 @@ function extractProductData(
   const text = ocrText.trim().length > 0 ? ocrText : blocks.map(b => b.text).join('\n')
 
   // 商品名：windowTitle 去除平台后缀
-  let name = windowTitle
+  const name = windowTitle
     .replace(/ - (淘宝|京东|天猫|拼多多|亚马逊|amazon|taobao|jd|tmall|pinduoduo)\s*$/i, '')
     .replace(/\s*[|｜]\s*(淘宝|京东|天猫|拼多多|亚马逊).*$/i, '')
     .trim()

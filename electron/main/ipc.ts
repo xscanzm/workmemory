@@ -13,6 +13,7 @@ import { WikiRepository } from '../db/repositories/WikiRepository'
 import { ReportRepository } from '../db/repositories/ReportRepository'
 import { PrivacyRuleRepository } from '../db/repositories/PrivacyRuleRepository'
 import { SearchRepository } from '../db/repositories/SearchRepository'
+import { SemanticSearchRepository } from '../db/repositories/SemanticSearchRepository'
 import { SettingsStore } from '../db/SettingsStore'
 import { DataManager } from '../db/DataManager'
 import { getAiManager } from '../ai/AiManager'
@@ -57,6 +58,7 @@ import type {
 import { getWikiIngestManager } from '../wiki/WikiIngestManager'
 import { getInsightsManager } from '../insights/InsightsManager'
 import { getMascotManager } from '../mascot/MascotManager'
+import { recordFeedback } from '../ai/FeedbackLoop'
 import { validatedHandler } from '../ipc/validatedHandler'
 import {
   segmentSchemas,
@@ -144,7 +146,23 @@ export function registerIpcHandlers(): void {
   validatedHandler(
     EpisodeChannels.Update,
     episodeSchemas.Update,
-    (_e, { id, patch }) => EpisodeRepository.update(id, patch as Partial<Episode>)
+    (_e, { id, patch }) => {
+      // 用户重命名 Episode（title 变更）时记录反馈，供 FeedbackLoop 分析
+      const patchObj = patch as Partial<Episode>
+      if (typeof patchObj.title === 'string' && patchObj.title.length > 0) {
+        const existing = EpisodeRepository.getById(id)
+        if (existing && existing.title !== patchObj.title) {
+          recordFeedback({
+            type: 'episode_renamed',
+            targetId: id,
+            before: existing.title,
+            after: patchObj.title,
+            timestamp: new Date().toISOString()
+          })
+        }
+      }
+      return EpisodeRepository.update(id, patchObj)
+    }
   )
   validatedHandler(EpisodeChannels.GetById, episodeSchemas.GetById, (_e, { id }) =>
     EpisodeRepository.getById(id)
@@ -311,7 +329,26 @@ export function registerIpcHandlers(): void {
   validatedHandler(
     ReportChannels.Update,
     reportSchemas.Update,
-    (_e, { id, patch }) => ReportRepository.update(id, patch as Partial<Report>)
+    (_e, { id, patch }) => {
+      const patchObj = patch as Partial<Report>
+      // 用户编辑日报正文（markdownContent 变更）时记录反馈，供 FeedbackLoop 分析编辑模式
+      if (
+        typeof patchObj.markdownContent === 'string' &&
+        patchObj.markdownContent.length > 0
+      ) {
+        const existing = ReportRepository.getById(id)
+        if (existing && existing.markdownContent !== patchObj.markdownContent) {
+          recordFeedback({
+            type: 'report_edited',
+            targetId: id,
+            before: existing.markdownContent,
+            after: patchObj.markdownContent,
+            timestamp: new Date().toISOString()
+          })
+        }
+      }
+      return ReportRepository.update(id, patchObj)
+    }
   )
   /** 业务 action：保存草稿（status 强制为 draft） */
   validatedHandler(ReportChannels.SaveDraft, reportSchemas.SaveDraft, (_e, draft) => {
@@ -538,6 +575,14 @@ export function registerIpcHandlers(): void {
   /* ============ Search (FTS5 全文搜索) ============ */
   validatedHandler(SearchChannels.Fts, searchSchemas.Fts, (_e, { query }) =>
     SearchRepository.search(query)
+  )
+
+  /* ============ Search (混合检索：FTS5 + 语义向量) ============ */
+  validatedHandler(
+    SearchChannels.Hybrid,
+    searchSchemas.Hybrid,
+    async (_e, { query, options }) =>
+      SemanticSearchRepository.hybridSearch(query, options ?? {})
   )
 
   /* ============ System (文件保存对话框) ============ */

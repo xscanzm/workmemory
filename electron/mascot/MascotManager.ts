@@ -26,8 +26,10 @@ import { TrayManager } from './TrayManager'
 import {
   IMascotNotifier,
   MascotBubblePayload,
+  MascotBubbleType,
   setMascotNotifier
 } from './MascotNotifier'
+import type { Advice } from '../ai/ProactiveAdvisor'
 import { getCaptureManager } from '../capture/CaptureManager'
 import { getOcrManager } from '../ocr/OcrManager'
 import { getEpisodeManager } from '../capture/EpisodeManager'
@@ -192,6 +194,28 @@ export class MascotManager implements IMascotNotifier {
   /** 重置当天频率限制（跨日时调用） */
   resetDailyLimit(): void {
     this.frequencyLimiter.resetDailyLimit()
+  }
+
+  /**
+   * 接收 ProactiveAdvisor 产出的 Advice 并通过气泡推送（Task R4）。
+   * 将 Advice 映射为 MascotBubblePayload 并调用 tryShowBubble。
+   * @returns true 表示已展示；false 表示被频率限制拦截
+   */
+  notifyAdvice(advice: Advice): boolean {
+    const bubbleType: MascotBubbleType =
+      advice.type === 'skill_reference' ? 'insight' : 'reminder'
+    const payload: MascotBubblePayload = {
+      type: bubbleType,
+      title: advice.title,
+      message: advice.message
+    }
+    if (advice.action) {
+      payload.action = {
+        type: 'navigate',
+        page: advice.type === 'skill_reference' ? 'skills' : 'reflection'
+      }
+    }
+    return this.tryShowBubble(payload)
   }
 
   // ===================== 状态/形象控制 =====================

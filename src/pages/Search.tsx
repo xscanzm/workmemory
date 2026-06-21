@@ -29,7 +29,7 @@ import {
   type BadgeVariant
 } from '@/ui'
 import type { CleanEpisode, Episode, WorkSegment } from '@/types'
-import type { FtsSearchResult } from '../../electron/types/ipc'
+import type { FtsSearchResult, HybridSearchResult, HybridMatchType } from '../../electron/types/ipc'
 import './Search.css'
 
 /** 每日总结标记 topic */
@@ -373,6 +373,20 @@ const ENTITY_BADGE_VARIANT: Record<string, BadgeVariant> = {
   url: 'default'
 }
 
+/** 混合检索 matchType → 展示标签 */
+const MATCH_TYPE_LABELS: Record<HybridMatchType, string> = {
+  keyword: '关键词匹配',
+  semantic: '语义相似',
+  hybrid: '混合匹配'
+}
+
+/** 混合检索 matchType → Badge 颜色变体 */
+const MATCH_TYPE_BADGE_VARIANT: Record<HybridMatchType, BadgeVariant> = {
+  keyword: 'accent',
+  semantic: 'cyan',
+  hybrid: 'success'
+}
+
 // ===================== 主组件 =====================
 
 export function Search(): JSX.Element {
@@ -388,6 +402,9 @@ export function Search(): JSX.Element {
   const [hasSearched, setHasSearched] = useState<boolean>(false)
   /** FTS5 全文搜索结果（异步获取） */
   const [ftsResult, setFtsResult] = useState<FtsSearchResult | null>(null)
+  /** 混合检索结果（FTS5 关键词 + 语义向量，异步获取） */
+  const [hybridResults, setHybridResults] = useState<HybridSearchResult[]>([])
+  const [hybridLoading, setHybridLoading] = useState<boolean>(false)
 
   // 加载最近 SEARCH_DAYS 天的数据
   const dates = useMemo<string[]>(() => getRecentDates(SEARCH_DAYS), [])
@@ -461,6 +478,33 @@ export function Search(): JSX.Element {
           console.error('[Search] FTS5 搜索失败，回退本地匹配:', e instanceof Error ? e.message : String(e))
           setFtsResult(null)
         }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [debouncedQuery])
+
+  // 混合检索（FTS5 关键词 + 语义向量，异步，debouncedQuery 变化时触发）
+  useEffect(() => {
+    if (!debouncedQuery) {
+      setHybridResults([])
+      return
+    }
+    let cancelled = false
+    setHybridLoading(true)
+    window.workmemory.search
+      .hybrid(debouncedQuery, { limit: 10 })
+      .then((results) => {
+        if (!cancelled) setHybridResults(results)
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          console.error('[Search] 混合检索失败:', e instanceof Error ? e.message : String(e))
+          setHybridResults([])
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setHybridLoading(false)
       })
     return () => {
       cancelled = true
@@ -731,6 +775,27 @@ export function Search(): JSX.Element {
         </div>
       )}
 
+      {hasSearched && (hybridLoading || hybridResults.length > 0) && (
+        <div className="wm-search-hybrid">
+          <div className="wm-search-hybrid-header">
+            <span className="wm-search-hybrid-title">记忆单元匹配</span>
+            <span className="wm-search-hybrid-subtitle">关键词 + 语义混合检索</span>
+          </div>
+          {hybridLoading ? (
+            <div className="wm-search-hybrid-loading">
+              <Loader2 size={14} className="wm-search-loading-spinner" />
+              <span>正在语义检索记忆单元...</span>
+            </div>
+          ) : (
+            <div className="wm-search-hybrid-list">
+              {hybridResults.map((result, idx) => (
+                <MemCellHitCard key={result.memCellId} result={result} rank={idx + 1} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
     </div>
   )
 }
@@ -843,5 +908,69 @@ function SnippetPreview({ snippet }: { snippet: string }): JSX.Element {
         )
       )}
     </p>
+  )
+}
+
+// ===================== 记忆单元混合检索卡片 =====================
+
+interface MemCellHitCardProps {
+  result: HybridSearchResult
+  rank: number
+}
+
+/**
+ * 渲染混合检索记忆单元匹配结果：
+ * - matchType 标签（关键词匹配 / 语义相似 / 混合匹配）
+ * - 综合得分、关键词得分、语义得分
+ * - MemCell episode 叙事文本
+ * - FTS5 命中片段（关键词匹配时有）
+ */
+function MemCellHitCard({ result, rank }: MemCellHitCardProps): JSX.Element {
+  const { matchType, score, memCell, snippet } = result
+  return (
+    <Card variant="acrylic" padding="md" className="wm-search-hybrid-hit">
+      <div className={`wm-search-hit-rank ${rank === 1 ? 'wm-search-hit-rank-top' : ''}`}>
+        {rank}
+      </div>
+      <div className="wm-search-hit-body">
+        <div className="wm-search-hit-header">
+          <Badge variant={MATCH_TYPE_BADGE_VARIANT[matchType]} size="sm" dot>
+            {MATCH_TYPE_LABELS[matchType]}
+          </Badge>
+          <Badge variant="privacy" size="sm" className="wm-search-hit-score">
+            得分 {score.toFixed(3)}
+          </Badge>
+        </div>
+        {memCell && (
+          <>
+            <p className="wm-search-hit-summary">{memCell.episode}</p>
+            {memCell.facts.length > 0 && (
+              <div className="wm-search-hit-topics">
+                {memCell.facts.slice(0, 3).map((fact, i) => (
+                  <Badge key={i} variant="default" size="sm">{fact}</Badge>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+        {snippet && (
+          <div className="wm-search-hit-snippets">
+            <SnippetPreview snippet={snippet} />
+          </div>
+        )}
+        <div className="wm-search-hybrid-scores">
+          {result.keywordScore !== undefined && (
+            <span className="wm-search-hybrid-score-item">
+              关键词: {result.keywordScore.toFixed(3)}
+            </span>
+          )}
+          {result.semanticScore !== undefined && (
+            <span className="wm-search-hybrid-score-item">
+              语义: {result.semanticScore.toFixed(3)}
+            </span>
+          )}
+        </div>
+      </div>
+    </Card>
   )
 }

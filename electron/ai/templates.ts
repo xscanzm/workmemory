@@ -5,8 +5,109 @@
  *
  * 每个模板导出 buildPrompt(params) 函数，构建 { systemPrompt, userPrompt }。
  * 所有模板的 systemPrompt 包含"内容真实不虚构"强约束。
+ *
+ * Task RP1：新增 'structured' 模板与 structuredSections 配置，
+ * 支持按 sections 分区输出结构化日报（管家总结/今日做了什么/今日看了什么/...）。
  */
 import type { ReportTemplate } from '@/types'
+
+/** 结构化日报分区类型（Task RP1.1） */
+export type ReportSection =
+  | 'butler_summary'      // 管家总结
+  | 'what_i_did'          // 今日做了什么
+  | 'what_i_saw'          // 今日看了什么
+  | 'themes'              // 主题归纳
+  | 'timeline'            // 时间线
+  | 'chat_notes'          // 聊天记录要点
+  | 'web_notes'           // 网页记录要点
+  | 'forum_notes'         // 论坛记录要点
+  | 'video_notes'         // 视频记录要点
+  | 'product_notes'       // 商品记录要点
+  | 'evidence'            // 证据片段
+  | 'suggestions'         // 优化建议
+
+/** 默认结构化分区（Task RP1.2） */
+export const DEFAULT_STRUCTURED_SECTIONS: ReportSection[] = [
+  'butler_summary',
+  'what_i_did',
+  'what_i_saw',
+  'themes',
+  'timeline',
+  'chat_notes',
+  'web_notes',
+  'forum_notes',
+  'video_notes',
+  'product_notes',
+  'evidence',
+  'suggestions'
+]
+
+/** 分区标题映射（中文） */
+export const REPORT_SECTION_TITLES: Record<ReportSection, string> = {
+  butler_summary: '管家总结',
+  what_i_did: '今日做了什么',
+  what_i_saw: '今日看了什么',
+  themes: '主题归纳',
+  timeline: '时间线',
+  chat_notes: '聊天记录要点',
+  web_notes: '网页记录要点',
+  forum_notes: '论坛记录要点',
+  video_notes: '视频记录要点',
+  product_notes: '商品记录要点',
+  evidence: '证据片段',
+  suggestions: '优化建议'
+}
+
+/** 时间线条目 */
+export interface TimelineEntry {
+  /** 时间段，如 "2026-03-29T17:47:54+08:00 ~ 2026-03-29T17:48:19+08:00" */
+  time: string
+  /** 时间线条目标题 */
+  title: string
+  /** 细节 */
+  detail?: string
+  /** 金句/字幕 */
+  quote?: string
+  /** 证据 */
+  evidence?: string
+}
+
+/** 分类要点（聊天/网页/论坛/视频/商品） */
+export interface CategoryNote {
+  /** 要点标题 */
+  title: string
+  /** 详细内容 */
+  details: string[]
+}
+
+/** 结构化日报数据模型（Task RP1.11） */
+export interface StructuredReport {
+  date: string
+  /** 管家总结 */
+  butlerSummary: string
+  /** 今日做了什么（列表） */
+  whatIDid: string[]
+  /** 今日看了什么（列表） */
+  whatISaw: string[]
+  /** 主题归纳 */
+  themes: string[]
+  /** 时间线 */
+  timeline: TimelineEntry[]
+  /** 聊天记录要点 */
+  chatNotes: CategoryNote[]
+  /** 网页记录要点 */
+  webNotes: CategoryNote[]
+  /** 论坛记录要点 */
+  forumNotes: CategoryNote[]
+  /** 视频记录要点 */
+  videoNotes: CategoryNote[]
+  /** 商品记录要点 */
+  productNotes: CategoryNote[]
+  /** 证据片段 */
+  evidence: string[]
+  /** 优化建议 */
+  suggestions: string[]
+}
 
 /** 模板渲染参数 */
 export interface TemplateParams {
@@ -36,6 +137,8 @@ export interface ReportTemplateDef {
   userPromptTemplate: string
   /** 是否启用结构化输出（JSON 模式），默认 false；为 true 时调用方会以 json_object 模式请求并渲染为 Markdown */
   structuredOutput?: boolean
+  /** 结构化分区配置（Task RP1.1）：控制输出哪些分类要点；为空或不设置则不启用结构化分区输出 */
+  structuredSections?: ReportSection[]
   /** 构建提示词（每个模板独立导出） */
   buildPrompt: (params: TemplateParams) => BuiltPrompt
 }
@@ -164,6 +267,46 @@ export const REPORT_TEMPLATES: Record<ReportTemplate, ReportTemplateDef> = {
 - 全文使用 Markdown，结构清晰`,
     buildPrompt(params: TemplateParams): BuiltPrompt {
       return defaultBuildPrompt(REPORT_TEMPLATES.okr, params)
+    }
+  },
+  structured: {
+    id: 'structured',
+    name: '结构化分区版',
+    description: '按管家总结/今日做了什么/今日看了什么/主题归纳/时间线/分类要点/证据/建议分区输出',
+    systemPrompt: `${COMMON_SYSTEM_PROMPT}
+6. 采用"结构化分区"风格：按指定的 sections 分区输出，每个分区有明确标题与要点。
+7. 输出 JSON 对象，字段对应分区：butlerSummary（字符串）、whatIDid/whatISaw/themes/evidence/suggestions（字符串数组）、timeline（TimelineEntry 数组）、chatNotes/webNotes/forumNotes/videoNotes/productNotes（CategoryNote 数组）。
+8. 严禁虚构：所有要点必须来源于提供的片段/记忆单元/因果链上下文。`,
+    userPromptTemplate: `请根据以下今日工作上下文，生成一份"结构化分区版"日报。
+
+## 日期
+{{date}}
+
+## 今日工作片段（timeline）
+{{timeline}}
+
+## 涉及项目标签（project_tags）
+{{project_tags}}
+
+## 用户备注（user_notes）
+{{user_notes}}
+
+## 输出要求
+- 输出 JSON 对象，包含以下字段：
+  - butlerSummary: string（管家总结，1-3 句话概括当日整体情况）
+  - whatIDid: string[]（今日做了什么，每条一句话）
+  - whatISaw: string[]（今日看了什么，每条一句话）
+  - themes: string[]（主题归纳，每条一个主题）
+  - timeline: Array<{ time: string; title: string; detail?: string; quote?: string; evidence?: string }>
+  - chatNotes/webNotes/forumNotes/videoNotes/productNotes: Array<{ title: string; details: string[] }>
+  - evidence: string[]（证据片段，每条 ≤80 字）
+  - suggestions: string[]（优化建议）
+- 严格基于上下文，禁止虚构
+- 如果某类内容没有对应片段，对应数组为空`,
+    structuredOutput: true,
+    structuredSections: DEFAULT_STRUCTURED_SECTIONS,
+    buildPrompt(params: TemplateParams): BuiltPrompt {
+      return defaultBuildPrompt(REPORT_TEMPLATES.structured, params)
     }
   }
 }

@@ -2,10 +2,14 @@
  * DistillManager：整点低频 AI 理解批处理。
  */
 import { randomUUID } from 'node:crypto'
-import type { CleanEpisode, EntityRef, EvidenceRef } from '@/types'
+import type { CleanEpisode, EntityRef, EvidenceRef, WorkSegment } from '@/types'
 import { getDatabase } from '../db/database'
 import { SettingsStore } from '../db/SettingsStore'
 import { CleanEpisodeRepository } from '../db/repositories/CleanEpisodeRepository'
+import { MemCellRepository } from '../db/repositories/MemCellRepository'
+import { SegmentRepository } from '../db/repositories/SegmentRepository'
+import type { MemCell } from '../memory/MemCell'
+import { MEMCELL_CREATED_EVENT, memCellEventBus } from '../events/bus'
 import { OpenAIClient } from './OpenAIClient'
 import { maskSensitive } from './SensitiveMasker'
 import { HourContextPackBuilder } from './HourContextPackBuilder'
@@ -121,6 +125,83 @@ function normalizeEvent(
     updatedAt: ts,
     modelName,
     distillVersion: DISTILL_VERSION
+  }
+}
+
+/** 多数投票计算主导 activityType（忽略 undefined/idle） */
+function dominantActivityType(segments: WorkSegment[]): string | undefined {
+  const counts = new Map<string, number>()
+  for (const s of segments) {
+    if (s.activityType && s.activityType !== 'idle') {
+      counts.set(s.activityType, (counts.get(s.activityType) ?? 0) + 1)
+    }
+  }
+  if (counts.size === 0) return undefined
+  let best: string | undefined
+  let bestCount = 0
+  for (const [type, count] of counts) {
+    if (count > bestCount) {
+      best = type
+      bestCount = count
+    }
+  }
+  return best
+}
+
+/** 多数投票计算主导 contentType（忽略 undefined/other） */
+function dominantContentType(segments: WorkSegment[]): string | undefined {
+  const counts = new Map<string, number>()
+  for (const s of segments) {
+    if (s.contentType && s.contentType !== 'other') {
+      counts.set(s.contentType, (counts.get(s.contentType) ?? 0) + 1)
+    }
+  }
+  if (counts.size === 0) return undefined
+  let best: string | undefined
+  let bestCount = 0
+  for (const [type, count] of counts) {
+    if (count > bestCount) {
+      best = type
+      bestCount = count
+    }
+  }
+  return best
+}
+
+/** 从 AI 输出事件 + CleanEpisode 构造 MemCell */
+function buildMemCell(event: DistillEvent, cleanEpisode: CleanEpisode): MemCell {
+  const segments = SegmentRepository.getByIds(cleanEpisode.segmentIds)
+  const activityType = dominantActivityType(segments)
+  const contentType = dominantContentType(segments)
+
+  const episode = (event.episode ?? '').trim() || cleanEpisode.summary
+  const facts = (event.facts ?? [])
+    .map((f) => f.trim())
+    .filter((f) => f.length > 0)
+  const foresight = (event.foresight ?? [])
+    .map((f) => ({
+      statement: f.statement.trim(),
+      validFrom: f.validFrom,
+      validTo: f.validTo,
+      confidence: clampConfidence(f.confidence)
+    }))
+    .filter((f) => f.statement.length > 0)
+
+  const ts = nowIso()
+  return {
+    id: randomUUID(),
+    cleanEpisodeId: cleanEpisode.id,
+    episode,
+    facts,
+    foresight,
+    metadata: {
+      segmentIds: cleanEpisode.segmentIds,
+      timestamp: ts,
+      confidence: cleanEpisode.confidence,
+      activityType,
+      contentType
+    },
+    createdAt: ts
   }
 }
 
@@ -308,10 +389,16 @@ export class DistillManager {
       }
 
       const allowedSegmentIds = new Set(pack.segmentIds)
-      const cleanEpisodes = events
-        .map((event) => normalizeEvent(event, date, hourBucket, allowedSegmentIds, apiConfig.model))
-        .filter((event): event is CleanEpisode => event !== null)
-      if (cleanEpisodes.length === 0) {
+      const pairs = events
+        .map((event) => ({
+          event,
+          cleanEpisode: normalizeEvent(event, date, hourBucket, allowedSegmentIds, apiConfig.model)
+        }))
+        .filter(
+          (pair): pair is { event: DistillEvent; cleanEpisode: CleanEpisode } =>
+            pair.cleanEpisode !== null
+        )
+      if (pairs.length === 0) {
         const errorMessage = `AI JSON 解析失败，跳过 ${skipped} 条`
         upsertRun(date, hourBucket, {
           status: 'failed',
@@ -322,10 +409,42 @@ export class DistillManager {
         return { created: 0, skipped: false, message: errorMessage }
       }
 
-      CleanEpisodeRepository.deleteByHour(date, hourBucket)
-      for (const event of cleanEpisodes) {
-        CleanEpisodeRepository.insert(event)
+      // 清理旧 MemCell（避免外键约束阻止 CleanEpisode 删除）
+      try {
+        const db = getDatabase()
+        db.prepare(
+          `DELETE FROM memory_cells WHERE clean_episode_id IN (
+            SELECT id FROM clean_episodes WHERE date = ? AND hour_bucket = ?
+          )`
+        ).run(date, hourBucket)
+      } catch (e) {
+        console.warn(
+          '[DistillManager] 清理旧 MemCell 失败:',
+          e instanceof Error ? e.message : String(e)
+        )
       }
+
+      CleanEpisodeRepository.deleteByHour(date, hourBucket)
+      for (const { cleanEpisode } of pairs) {
+        CleanEpisodeRepository.insert(cleanEpisode)
+      }
+
+      // 写入 MemCell（错误隔离：失败不阻塞 CleanEpisode 写入）
+      for (const { event, cleanEpisode } of pairs) {
+        try {
+          const memCell = buildMemCell(event, cleanEpisode)
+          MemCellRepository.insert(memCell)
+          // 通知 MemCellIndexer 异步生成 embedding（事件发射同步、监听器内部异步处理，
+          // 任何异常都被监听器自身捕获，不会影响主流程）
+          memCellEventBus.emit(MEMCELL_CREATED_EVENT, memCell)
+        } catch (e) {
+          console.error(
+            '[DistillManager] MemCell 写入失败:',
+            e instanceof Error ? e.message : String(e)
+          )
+        }
+      }
+
       SettingsStore.set({ aiDistillLastRunAt: nowIso() })
       upsertRun(date, hourBucket, {
         status: 'success',
@@ -333,7 +452,7 @@ export class DistillManager {
         modelName: apiConfig.model,
         errorMessage: ''
       })
-      return { created: cleanEpisodes.length, skipped: false, message: `已生成 ${cleanEpisodes.length} 条工作记忆事件` }
+      return { created: pairs.length, skipped: false, message: `已生成 ${pairs.length} 条工作记忆事件` }
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e)
       upsertRun(date, hourBucket, {

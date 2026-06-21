@@ -282,3 +282,56 @@
   padding: 0 2px;
   border-radius: 2px;
 }
+
+/* ===================== 混合检索（记忆单元匹配） ===================== */
+.wm-search-hybrid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wm-spacing-sm);
+}
+.wm-search-hybrid-header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--wm-spacing-sm);
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--wm-color-border);
+}
+.wm-search-hybrid-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #7c5cff;
+}
+.wm-search-hybrid-subtitle {
+  font-size: 11px;
+  color: var(--wm-color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.wm-search-hybrid-loading {
+  display: flex;
+  align-items: center;
+  gap: var(--wm-spacing-sm);
+  padding: var(--wm-spacing-md);
+  color: var(--wm-color-text-muted);
+  font-size: 12px;
+}
+.wm-search-hybrid-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wm-spacing-sm);
+}
+.wm-search-hybrid-hit {
+  display: flex;
+  gap: var(--wm-spacing-md);
+  text-align: left;
+}
+.wm-search-hybrid-scores {
+  display: flex;
+  gap: var(--wm-spacing-md);
+  margin-top: 4px;
+}
+.wm-search-hybrid-score-item {
+  font-size: 10px;
+  color: var(--wm-color-text-muted);
+  font-variant-numeric: tabular-nums;
+}

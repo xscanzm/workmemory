@@ -22,6 +22,14 @@ const evidenceRefSchema = z.object({
   reason: z.string().default('')
 })
 
+/** MemCell foresight：带有效期的前瞻性预见 */
+const foresightSchema = z.object({
+  statement: z.string().min(1),
+  validFrom: z.string().min(1),
+  validTo: z.string().min(1),
+  confidence: z.number().min(0).max(1)
+})
+
 export const DistillEventSchema = z.object({
   title: z.string().min(1),
   summary: z.string().min(1),
@@ -52,7 +60,13 @@ export const DistillEventSchema = z.object({
   wikiEligible: z.boolean().default(false),
   wikiStatus: z
     .enum(['none', 'candidate', 'auto_upserted', 'needs_review', 'rejected'])
-    .default('none')
+    .default('none'),
+  /** MemCell episode：第三人称叙事（可选，向后兼容旧 AI 输出） */
+  episode: z.string().optional(),
+  /** MemCell facts：原子事实数组（可选，默认空数组） */
+  facts: z.array(z.string()).default([]),
+  /** MemCell foresight：带有效期的预见数组（可选，默认空数组） */
+  foresight: z.array(foresightSchema).default([])
 })
 
 export type DistillEvent = z.infer<typeof DistillEventSchema>

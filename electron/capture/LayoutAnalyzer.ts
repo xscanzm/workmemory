@@ -18,7 +18,7 @@
  *   若最高分 ≥ 0.5 则赋该类型，否则返回 'other'。
  *   并列时按迭代顺序靠前者优先（专用类型前置，list 兜底）。
  */
-import type { BoundsRect, LayoutRegion, LayoutType, OcrBlock } from '@/types'
+import type { LayoutRegion, LayoutType, OcrBlock } from '@/types'
 
 /** 分析结果 */
 export interface LayoutAnalysis {
@@ -35,8 +35,8 @@ const RULES_PER_TYPE = 3
 
 // ===================== 通用正则 =====================
 
-/** 按钮文字关键词（中英文） */
-const BUTTON_KEYWORDS = /(提交|取消|确定|保存|重置|登录|注册|搜索|应用|关闭|确认|submit|cancel|save|reset|login|sign in|sign up|search|apply|confirm|close|ok)\b/i
+/** 按钮文字关键词（中英文）。中文不用 \b（\b 在汉字后不生效），英文保留 \b 防止子串误匹配。 */
+const BUTTON_KEYWORDS = /(提交|取消|确定|保存|重置|登录|注册|搜索|应用|关闭|确认)|(?:\b(?:submit|cancel|save|reset|login|sign in|sign up|search|apply|confirm|close|ok)\b)/i
 
 /** 标签冒号模式（"姓名：" / "Name:" 结尾） */
 const LABEL_COLON_REGEX = /[:：]\s*$/
@@ -58,9 +58,17 @@ const NUMERIC_REGEX = /\b\d+(\.\d+)?\s*(%|k|m|万|亿)?\b/
 
 // ===================== 工具函数 =====================
 
-/** 将 OcrBlock.box（x/y/w/h）转换为 BoundsRect（x/y/width/height） */
-function toBounds(box: { x: number; y: number; w: number; h: number }): BoundsRect {
-  return { x: box.x, y: box.y, width: box.w, height: box.h }
+/**
+ * 从 OcrBlock 构造 LayoutRegion。
+ * bounds 直接复用 block.box（{ x, y, w, h }），confidence 继承自源 block。
+ */
+function makeRegion(type: string, block: OcrBlock): LayoutRegion {
+  return {
+    type,
+    bounds: { x: block.box.x, y: block.box.y, w: block.box.w, h: block.box.h },
+    text: block.text,
+    confidence: block.confidence
+  }
 }
 
 /** 保留两位小数（与 ActivityClassifier 等模块的置信度精度一致） */
@@ -124,8 +132,8 @@ function detectForm(blocks: OcrBlock[]): { matched: number; regions: LayoutRegio
     )
     if (inputBlock) {
       pairs++
-      regions.push({ type: 'label', bounds: toBounds(label.box), text: label.text })
-      regions.push({ type: 'input', bounds: toBounds(inputBlock.box), text: inputBlock.text })
+      regions.push(makeRegion('label', label))
+      regions.push(makeRegion('input', inputBlock))
     }
   }
   if (pairs >= 2) matched++
@@ -134,7 +142,7 @@ function detectForm(blocks: OcrBlock[]): { matched: number; regions: LayoutRegio
   const buttons = blocks.filter(b => BUTTON_KEYWORDS.test(b.text.trim()))
   if (buttons.length >= 1) matched++
   for (const btn of buttons) {
-    regions.push({ type: 'button', bounds: toBounds(btn.box), text: btn.text })
+    regions.push(makeRegion('button', btn))
   }
 
   // 规则3：垂直排列的表单字段（≥ 3 个不同 y 坐标的标签）
@@ -143,7 +151,7 @@ function detectForm(blocks: OcrBlock[]): { matched: number; regions: LayoutRegio
   // 为未配对的标签补充 label region
   for (const label of labels) {
     if (!regions.some(r => r.type === 'label' && r.text === label.text)) {
-      regions.push({ type: 'label', bounds: toBounds(label.box), text: label.text })
+      regions.push(makeRegion('label', label))
     }
   }
 
@@ -182,7 +190,7 @@ function detectList(blocks: OcrBlock[]): { matched: number; regions: LayoutRegio
   if (sorted.length >= 5) {
     matched++
     for (const b of sorted) {
-      regions.push({ type: 'list-item', bounds: toBounds(b.box), text: b.text })
+      regions.push(makeRegion('list-item', b))
     }
   }
 
@@ -206,7 +214,7 @@ function detectArticle(blocks: OcrBlock[]): { matched: number; regions: LayoutRe
   if (blocks.length > 0 && longBlocks.length / blocks.length >= 0.5) {
     matched++
     for (const b of longBlocks) {
-      regions.push({ type: 'paragraph', bounds: toBounds(b.box), text: b.text })
+      regions.push(makeRegion('paragraph', b))
     }
   }
 
@@ -259,7 +267,7 @@ function detectEditor(blocks: OcrBlock[]): { matched: number; regions: LayoutReg
     if (consecutive >= 2) {
       matched++
       for (const b of lineNumberBlocks) {
-        regions.push({ type: 'code-line', bounds: toBounds(b.box), text: b.text })
+        regions.push(makeRegion('code-line', b))
       }
     }
   }
@@ -304,10 +312,10 @@ function detectChat(blocks: OcrBlock[]): { matched: number; regions: LayoutRegio
     if (rightAligned.length >= 1) {
       matched++
       for (const b of leftBlocks) {
-        regions.push({ type: 'bubble', bounds: toBounds(b.box), text: b.text })
+        regions.push(makeRegion('bubble', b))
       }
       for (const b of rightBlocks) {
-        regions.push({ type: 'bubble', bounds: toBounds(b.box), text: b.text })
+        regions.push(makeRegion('bubble', b))
       }
     }
   }
@@ -320,7 +328,7 @@ function detectChat(blocks: OcrBlock[]): { matched: number; regions: LayoutRegio
   if (avatars.length >= 2) {
     matched++
     for (const b of avatars) {
-      regions.push({ type: 'avatar', bounds: toBounds(b.box), text: b.text })
+      regions.push(makeRegion('avatar', b))
     }
   }
 
@@ -329,7 +337,7 @@ function detectChat(blocks: OcrBlock[]): { matched: number; regions: LayoutRegio
   if (nicknames.length >= 2) {
     matched++
     for (const b of nicknames) {
-      regions.push({ type: 'nickname', bounds: toBounds(b.box), text: b.text })
+      regions.push(makeRegion('nickname', b))
     }
   }
 
@@ -368,8 +376,8 @@ function detectDashboard(blocks: OcrBlock[]): { matched: number; regions: Layout
     )
     if (nearbyLabel) {
       cardCount++
-      regions.push({ type: 'card', bounds: toBounds(num.box), text: num.text })
-      regions.push({ type: 'card-label', bounds: toBounds(nearbyLabel.box), text: nearbyLabel.text })
+      regions.push(makeRegion('card', num))
+      regions.push(makeRegion('card-label', nearbyLabel))
     }
   }
   if (cardCount >= 2) matched++
