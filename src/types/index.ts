@@ -23,7 +23,7 @@ export type MascotStyle = 'note' | 'film' | 'copilot' | 'cursor' | 'paper'
 export type MascotState = 'recording' | 'paused' | 'privacy' | 'ocr_scanning' | 'report_ready'
 
 /** 日报模板 */
-export type ReportTemplate = 'enhanced' | 'concise' | 'okr'
+export type ReportTemplate = 'enhanced' | 'concise' | 'okr' | 'structured'
 
 /** 本地 OCR 模型 */
 export type OcrModel = 'tiny' | 'small'
@@ -118,6 +118,22 @@ export interface WorkSegment {
   activeWindowBounds?: BoundsRect | null
   /** 整屏降级时的屏幕范围 */
   displayBounds?: BoundsRect | null
+  /** OCR 原始文本（未清洗） */
+  ocrRawText?: string
+  /** 噪声评分，用于过滤低质量片段 */
+  noiseScore?: number
+  /** 用户活动类型（由 ActivityClassifier 推断） */
+  activityType?: ActivityType
+  /** 屏幕内容类型（由 ContentClassifier 推断） */
+  contentType?: ContentType
+  /** 内容结构化数据（JSON 对象，由分类器填充的附加元信息） */
+  contentData?: Record<string, unknown>
+  /** 浏览器 URL（当 contentType 为 webpage 等场景时记录） */
+  browserUrl?: string
+  /** UI 布局类型（由 LayoutAnalyzer 推断） */
+  layoutType?: LayoutType
+  /** 用户操作流类型（由 ActionFlowInferrer 推断） */
+  actionFlow?: ActionFlow
 }
 
 /** Episode：语义合并后的工作事件 */
@@ -135,6 +151,8 @@ export interface Episode {
   userEdited: boolean
   reportEligible: boolean
   wikiEligible: boolean
+  /** 聚类内多数 segment 的 activityType（忽略 undefined/idle）；全空则 undefined */
+  dominantActivityType?: ActivityType
 }
 
 export type MemoryKind =
@@ -357,4 +375,70 @@ export const defaultAppSettings: AppSettings = {
   aiDistillSchedule: 'hourly',
   aiDistillLastRunAt: '',
   aiDistillSendScreenshots: false
+}
+
+/**
+ * 用户活动类型（由 ActivityClassifier 基于 appName/windowTitle/ocrText 推断）。
+ * idle 为置信度不足时的默认兜底值。
+ */
+export type ActivityType =
+  | 'coding'
+  | 'writing'
+  | 'reading'
+  | 'browsing'
+  | 'chatting'
+  | 'designing'
+  | 'meeting'
+  | 'managing'
+  | 'idle'
+
+/**
+ * 屏幕内容类型（由 ContentClassifier 基于 appName/windowTitle/ocrText 推断）。
+ * other 为置信度不足时的默认兜底值。
+ */
+export type ContentType =
+  | 'chat'
+  | 'webpage'
+  | 'document'
+  | 'code'
+  | 'video'
+  | 'forum'
+  | 'product'
+  | 'other'
+
+/**
+ * UI 布局类型（由 LayoutAnalyzer 基于 OCR 块坐标分布推断）。
+ * other 为置信度不足时的默认兜底值。
+ */
+export type LayoutType =
+  | 'form'
+  | 'list'
+  | 'article'
+  | 'editor'
+  | 'chat'
+  | 'dashboard'
+  | 'other'
+
+/**
+ * 用户操作流类型（由 ActionFlowInferrer 基于相邻 segment 对比推断）。
+ * unknown 为无法识别时的默认兜底值。
+ */
+export type ActionFlow =
+  | 'copy-paste'
+  | 'switch-context'
+  | 'scroll-deep'
+  | 'edit-continuous'
+  | 'browse-linear'
+  | 'unknown'
+
+/**
+ * 布局区域（由 LayoutAnalyzer 提取的结构化区域）。
+ * type 如 'button'/'input'/'label'/'paragraph'/'bubble'/'avatar'/'card'/'list-item'/'code-line' 等。
+ * bounds 与 OcrBlock.box 一致使用 { x, y, w, h }；confidence 继承自源 OcrBlock。
+ */
+export interface LayoutRegion {
+  type: string
+  bounds: { x: number; y: number; w: number; h: number }
+  text: string
+  confidence: number
 }

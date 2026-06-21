@@ -349,7 +349,9 @@ const api = {
       invoke<boolean>(InsightsChannels.PushInsight, { title, message, navigatePage })
   },
   search: {
-    fts: (query: string) => invoke(SearchChannels.Fts, { query })
+    fts: (query: string) => invoke(SearchChannels.Fts, { query }),
+    hybrid: (query: string, options?: { limit?: number; keywordWeight?: number; semanticWeight?: number }) =>
+      invoke(SearchChannels.Hybrid, { query, options })
   }
 }
 

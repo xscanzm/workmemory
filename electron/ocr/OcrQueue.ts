@@ -17,11 +17,18 @@
  */
 import { EventEmitter } from 'node:events'
 import fs from 'node:fs'
-import type { WorkSegment } from '@/types'
+import type { OcrBlock, WorkSegment } from '@/types'
 import { SegmentRepository } from '../db/repositories/SegmentRepository'
 import { Screenshot } from '../capture/Screenshot'
+import { ActivityClassifier } from '../capture/ActivityClassifier'
+import { ContentClassifier } from '../capture/ContentClassifier'
+import { analyzeLayout } from '../capture/LayoutAnalyzer'
+import { collectBrowserUrl } from '../capture/BrowserContextCollector'
+import { inferActionFlow } from '../capture/ActionFlowInferrer'
+import type { SegmentLike } from '../capture/ActionFlowInferrer'
 import type { PpOcrEngine } from './PpOcrEngine'
 import type { OcrResult } from './PpOcrEngine'
+import { getOcrTextCleaner } from './OcrTextCleaner'
 
 /** OcrQueue 配置 */
 export interface OcrQueueConfig {
@@ -41,7 +48,7 @@ const DEFAULT_CONFIG: OcrQueueConfig = {
 }
 
 /** ocr_summary 截断长度 */
-const OCR_SUMMARY_MAX_LENGTH = 100
+const OCR_SUMMARY_MAX_LENGTH = 200
 
 /**
  * OcrQueue：OCR 处理队列。
@@ -66,6 +73,13 @@ export class OcrQueue extends EventEmitter {
   private idleTimer: NodeJS.Timeout | null = null
   /** 是否正在处理中（防止 processNext 重入） */
   private processingLock = false
+
+  /** 活动类型分类器实例 */
+  private activityClassifier = new ActivityClassifier()
+  /** 内容类型分类器实例 */
+  private contentClassifier = new ContentClassifier()
+  /** 按窗口键维护的上一个 segment 引用（用于 ActionFlowInferrer 推断操作流） */
+  private lastSegmentMap: Map<string, SegmentLike> = new Map()
 
   constructor(engine: PpOcrEngine, config?: Partial<OcrQueueConfig>) {
     super()
@@ -224,32 +238,49 @@ export class OcrQueue extends EventEmitter {
 
   /** OCR 成功回调 */
   private onOcrSuccess(segment: WorkSegment, result: OcrResult): void {
-    const trimmedText = result.text.trim()
-    const summary = trimmedText.slice(0, OCR_SUMMARY_MAX_LENGTH)
+    const { cleanedText, noiseScore } = getOcrTextCleaner().clean(result.text)
+    const summary = cleanedText.slice(0, OCR_SUMMARY_MAX_LENGTH)
 
-    // 判断状态：有文本 → ocr_done，无文本 → no_text
-    const sourceStatus = trimmedText.length > 0 ? 'ocr_done' : 'no_text'
+    // 判断状态：清洗后仍有文本 → ocr_done，否则 → no_text
+    const sourceStatus = cleanedText.length > 0 ? 'ocr_done' : 'no_text'
+
+    // 来源质量：噪声评分过高时降级，否则按 OCR 置信度判定
     const sourceQuality =
-      sourceStatus === 'ocr_done'
-        ? result.confidence >= 0.85
-          ? 'high'
-          : result.confidence >= 0.55
+      sourceStatus === 'no_text'
+        ? 'low'
+        : noiseScore > 0.7
+          ? 'low'
+          : noiseScore > 0.4
             ? 'medium'
-            : 'low'
-        : 'low'
+            : result.confidence >= 0.85
+              ? 'high'
+              : result.confidence >= 0.55
+                ? 'medium'
+                : 'low'
+
+    const ocrBlocks: OcrBlock[] = result.boxes.map((box) => ({
+      text: '',
+      box,
+      confidence: result.confidence
+    }))
+
+    // 感知增强：调用分类器（错误隔离，失败不阻塞 OCR 主流程）
+    const perception = this.applyPerceptionEnhancement(segment, cleanedText, ocrBlocks)
 
     SegmentRepository.update(segment.id, {
-      ocrText: trimmedText,
+      ocrText: cleanedText,
       ocrSummary: summary,
       sourceStatus,
-      ocrBlocks: result.boxes.map((box) => ({
-        text: '',
-        box,
-        confidence: result.confidence
-      })),
+      ocrBlocks,
       ocrConfidence: result.confidence,
-      sourceQuality
+      sourceQuality,
+      noiseScore,
+      ...(this.config.saveScreenshots ? { ocrRawText: result.text } : {}),
+      ...perception
     })
+
+    // 更新 lastSegment 引用（用于后续同窗口 segment 的 ActionFlowInferrer）
+    this.updateLastSegment(segment, cleanedText, perception.browserUrl)
 
     // 删除临时截图（若未开启保存）
     if (!this.config.saveScreenshots && segment.screenshotPath) {
@@ -257,6 +288,149 @@ export class OcrQueue extends EventEmitter {
     }
 
     this.emit('ocr-completed', segment.id)
+  }
+
+  // ===================== 感知增强 =====================
+
+  /**
+   * 生成窗口键：appName + windowTitle 的组合。
+   * 用于 lastSegment 维护，使 ActionFlowInferrer 能在同窗口的相邻 segment 间推断操作流。
+   */
+  private getWindowKey(segment: WorkSegment): string {
+    return `${segment.appName}::${segment.windowTitle}`
+  }
+
+  /**
+   * 感知增强：调用 5 个分类器，返回需写入 segment 的感知字段。
+   *
+   * 依次调用：
+   *  - ActivityClassifier.classifyActivity → activityType
+   *  - ContentClassifier.classifyContent → contentType + contentData
+   *  - LayoutAnalyzer.analyzeLayout → layoutType
+   *  - BrowserContextCollector.collectBrowserUrl → browserUrl
+   *  - ActionFlowInferrer.inferActionFlow（需前一个 segment）→ actionFlow
+   *
+   * 错误隔离：每个分类器独立 try-catch，失败时记录日志但不阻塞其他分类器或 OCR 主流程。
+   *
+   * @param segment 当前 segment（含 appName/windowTitle/processName/startTime/endTime）
+   * @param cleanedText 清洗后的 OCR 文本
+   * @param ocrBlocks OCR 文本块数组
+   * @returns 需写入 segment 的感知字段（activityType/contentType/contentData/browserUrl/layoutType/actionFlow）
+   */
+  private applyPerceptionEnhancement(
+    segment: WorkSegment,
+    cleanedText: string,
+    ocrBlocks: OcrBlock[]
+  ): Partial<WorkSegment> {
+    const result: Partial<WorkSegment> = {}
+    const windowKey = this.getWindowKey(segment)
+
+    // 1. ActivityClassifier：活动类型识别
+    try {
+      const activity = this.activityClassifier.classifyActivity({
+        appName: segment.appName,
+        windowTitle: segment.windowTitle,
+        ocrText: cleanedText,
+        ocrBlocks
+      })
+      result.activityType = activity.activityType
+    } catch (e) {
+      console.error(
+        `[OcrQueue] ActivityClassifier 失败 (segment=${segment.id}):`,
+        e instanceof Error ? e.message : String(e)
+      )
+    }
+
+    // 2. ContentClassifier：内容类型分类 + 结构化数据提取
+    try {
+      const content = this.contentClassifier.classifyContent({
+        appName: segment.appName,
+        windowTitle: segment.windowTitle,
+        ocrText: cleanedText,
+        ocrBlocks
+      })
+      result.contentType = content.contentType
+      result.contentData = content.contentData
+    } catch (e) {
+      console.error(
+        `[OcrQueue] ContentClassifier 失败 (segment=${segment.id}):`,
+        e instanceof Error ? e.message : String(e)
+      )
+    }
+
+    // 3. LayoutAnalyzer：UI 布局分析（基于 ocrBlocks 坐标分布）
+    try {
+      const layout = analyzeLayout(ocrBlocks)
+      result.layoutType = layout.layoutType
+    } catch (e) {
+      console.error(
+        `[OcrQueue] LayoutAnalyzer 失败 (segment=${segment.id}):`,
+        e instanceof Error ? e.message : String(e)
+      )
+    }
+
+    // 4. BrowserContextCollector：浏览器 URL 采集
+    try {
+      const browser = collectBrowserUrl({
+        processName: segment.processName,
+        windowTitle: segment.windowTitle
+      })
+      if (browser.url) {
+        result.browserUrl = browser.url
+      }
+    } catch (e) {
+      console.error(
+        `[OcrQueue] BrowserContextCollector 失败 (segment=${segment.id}):`,
+        e instanceof Error ? e.message : String(e)
+      )
+    }
+
+    // 5. ActionFlowInferrer：操作流推断（需要同窗口的前一个 segment）
+    try {
+      const prevSegment = this.lastSegmentMap.get(windowKey)
+      if (prevSegment) {
+        const currSegment: SegmentLike = {
+          id: segment.id,
+          appName: segment.appName,
+          windowTitle: segment.windowTitle,
+          ocrText: cleanedText,
+          startTime: segment.startTime,
+          endTime: segment.endTime,
+          browserUrl: result.browserUrl
+        }
+        const flow = inferActionFlow(prevSegment, currSegment)
+        result.actionFlow = flow.actionFlow
+      }
+    } catch (e) {
+      console.error(
+        `[OcrQueue] ActionFlowInferrer 失败 (segment=${segment.id}):`,
+        e instanceof Error ? e.message : String(e)
+      )
+    }
+
+    return result
+  }
+
+  /**
+   * 更新 lastSegment 引用：用当前 segment 的感知增强结果构造 SegmentLike 并存入 Map。
+   * 供下一个同窗口 segment 的 ActionFlowInferrer 使用。
+   */
+  private updateLastSegment(
+    segment: WorkSegment,
+    cleanedText: string,
+    browserUrl?: string
+  ): void {
+    const windowKey = this.getWindowKey(segment)
+    const segmentLike: SegmentLike = {
+      id: segment.id,
+      appName: segment.appName,
+      windowTitle: segment.windowTitle,
+      ocrText: cleanedText,
+      startTime: segment.startTime,
+      endTime: segment.endTime,
+      browserUrl
+    }
+    this.lastSegmentMap.set(windowKey, segmentLike)
   }
 
   /** OCR 失败回调 */

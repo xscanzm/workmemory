@@ -3,7 +3,7 @@
  * 全部使用参数化查询防注入；数组字段（tags）入库 JSON.stringify，出库 JSON.parse。
  */
 import { randomUUID } from 'node:crypto'
-import type { BoundsRect, CaptureSource, OcrBlock, SourceQuality, WorkSegment, SourceStatus } from '@/types'
+import type { ActionFlow, ActivityType, BoundsRect, CaptureSource, ContentType, LayoutType, OcrBlock, SourceQuality, WorkSegment, SourceStatus } from '@/types'
 import { getDatabase } from '../database'
 import { parseJsonArray, stringifyJsonArray } from '../json'
 
@@ -35,6 +35,14 @@ interface SegmentRow {
   source_quality?: string
   active_window_bounds?: string
   display_bounds?: string
+  ocr_raw_text?: string
+  noise_score?: number
+  activity_type?: string
+  content_type?: string
+  content_data?: string
+  browser_url?: string
+  layout_type?: string
+  action_flow?: string
 }
 
 function parseJsonObject<T>(value: string | undefined): T | null {
@@ -74,7 +82,15 @@ function rowToSegment(row: SegmentRow): WorkSegment {
     captureSource: (row.capture_source ?? 'unknown') as CaptureSource,
     sourceQuality: (row.source_quality ?? 'low') as SourceQuality,
     activeWindowBounds: parseJsonObject<BoundsRect>(row.active_window_bounds),
-    displayBounds: parseJsonObject<BoundsRect>(row.display_bounds)
+    displayBounds: parseJsonObject<BoundsRect>(row.display_bounds),
+    ocrRawText: row.ocr_raw_text ?? undefined,
+    noiseScore: row.noise_score ?? undefined,
+    activityType: (row.activity_type ?? undefined) as ActivityType | undefined,
+    contentType: (row.content_type ?? undefined) as ContentType | undefined,
+    contentData: parseJsonObject<Record<string, unknown>>(row.content_data) ?? undefined,
+    browserUrl: row.browser_url ?? undefined,
+    layoutType: (row.layout_type ?? undefined) as LayoutType | undefined,
+    actionFlow: (row.action_flow ?? undefined) as ActionFlow | undefined
   }
 }
 
@@ -106,6 +122,14 @@ interface SegmentInsertParams {
   source_quality: string
   active_window_bounds: string
   display_bounds: string
+  ocr_raw_text: string | null
+  noise_score: number | null
+  activity_type: string | null
+  content_type: string | null
+  content_data: string | null
+  browser_url: string | null
+  layout_type: string | null
+  action_flow: string | null
   created_at: string
   updated_at: string
 }
@@ -147,6 +171,14 @@ function segmentToParams(segment: WorkSegment): SegmentInsertParams {
     ),
     active_window_bounds: stringifyOptionalObject(segment.activeWindowBounds),
     display_bounds: stringifyOptionalObject(segment.displayBounds),
+    ocr_raw_text: segment.ocrRawText ?? null,
+    noise_score: segment.noiseScore ?? null,
+    activity_type: segment.activityType ?? null,
+    content_type: segment.contentType ?? null,
+    content_data: segment.contentData ? JSON.stringify(segment.contentData) : null,
+    browser_url: segment.browserUrl ?? null,
+    layout_type: segment.layoutType ?? null,
+    action_flow: segment.actionFlow ?? null,
     created_at: now,
     updated_at: now
   }
@@ -164,14 +196,16 @@ export const SegmentRepository = {
         is_selected_for_report, is_private, is_important, is_deleted, source_status,
         user_title, user_summary, user_note, tags, ocr_blocks, ocr_confidence,
         capture_source, source_quality, active_window_bounds, display_bounds,
-        created_at, updated_at
+        ocr_raw_text, noise_score, activity_type, content_type, content_data,
+        browser_url, layout_type, action_flow, created_at, updated_at
       ) VALUES (
         @id, @date, @start_time, @end_time, @duration_seconds, @app_name, @process_name,
         @window_title, @ocr_text, @ocr_summary, @image_hash, @screenshot_path,
         @is_selected_for_report, @is_private, @is_important, @is_deleted, @source_status,
         @user_title, @user_summary, @user_note, @tags, @ocr_blocks, @ocr_confidence,
         @capture_source, @source_quality, @active_window_bounds, @display_bounds,
-        @created_at, @updated_at
+        @ocr_raw_text, @noise_score, @activity_type, @content_type, @content_data,
+        @browser_url, @layout_type, @action_flow, @created_at, @updated_at
       )`
     ).run(params)
     const created = this.getById(id)
@@ -287,7 +321,10 @@ function db_update(params: SegmentInsertParams): void {
       user_note = @user_note, tags = @tags, ocr_blocks = @ocr_blocks,
       ocr_confidence = @ocr_confidence, capture_source = @capture_source,
       source_quality = @source_quality, active_window_bounds = @active_window_bounds,
-      display_bounds = @display_bounds, updated_at = @updated_at
+      display_bounds = @display_bounds, ocr_raw_text = @ocr_raw_text,
+      noise_score = @noise_score, activity_type = @activity_type, content_type = @content_type,
+      content_data = @content_data, browser_url = @browser_url, layout_type = @layout_type,
+      action_flow = @action_flow, updated_at = @updated_at
     WHERE id = @id`
   ).run(params)
 }

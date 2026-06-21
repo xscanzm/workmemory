@@ -2,14 +2,19 @@
  * DistillManager：整点低频 AI 理解批处理。
  */
 import { randomUUID } from 'node:crypto'
-import type { CleanEpisode, EntityRef, EvidenceRef, MemoryKind, SourceQuality, WikiStatus } from '@/types'
+import type { CleanEpisode, EntityRef, EvidenceRef, WorkSegment } from '@/types'
 import { getDatabase } from '../db/database'
 import { SettingsStore } from '../db/SettingsStore'
 import { CleanEpisodeRepository } from '../db/repositories/CleanEpisodeRepository'
+import { MemCellRepository } from '../db/repositories/MemCellRepository'
+import { SegmentRepository } from '../db/repositories/SegmentRepository'
+import type { MemCell } from '../memory/MemCell'
+import { MEMCELL_CREATED_EVENT, memCellEventBus } from '../events/bus'
 import { OpenAIClient } from './OpenAIClient'
 import { maskSensitive } from './SensitiveMasker'
 import { HourContextPackBuilder } from './HourContextPackBuilder'
 import { DISTILL_VERSION, buildDistillMessages } from './DistillPrompt'
+import { parseDistillResponse, type DistillEvent } from './schemas/DistillEventSchema'
 
 interface DistillRunRow {
   id: string
@@ -24,50 +29,11 @@ interface DistillRunRow {
   updated_at: string
 }
 
-interface RawDistillEvent {
-  title?: unknown
-  summary?: unknown
-  startTime?: unknown
-  endTime?: unknown
-  memoryKind?: unknown
-  project?: unknown
-  entities?: unknown
-  topics?: unknown
-  materials?: unknown
-  outputs?: unknown
-  todos?: unknown
-  blockers?: unknown
-  segmentIds?: unknown
-  evidenceRefs?: unknown
-  sourceQuality?: unknown
-  confidence?: unknown
-  reportEligible?: unknown
-  wikiEligible?: unknown
-  wikiStatus?: unknown
-}
-
-interface RawDistillResponse {
-  events?: unknown
-}
-
 export interface DistillResult {
   created: number
   skipped: boolean
   message: string
 }
-
-const VALID_MEMORY_KINDS = new Set<MemoryKind>([
-  'work',
-  'research',
-  'communication',
-  'coding',
-  'planning',
-  'review',
-  'admin',
-  'idle_uncertain'
-])
-const VALID_SOURCE_QUALITY = new Set<SourceQuality>(['high', 'medium', 'low', 'failed', 'private'])
-const VALID_WIKI_STATUS = new Set<WikiStatus>(['none', 'candidate', 'auto_upserted', 'needs_review', 'rejected'])
 
 function nowIso(): string {
   return new Date().toISOString()
@@ -82,117 +48,160 @@ function jsonArray(value: string): string[] {
   }
 }
 
-function parseJsonFromModel(content: string): RawDistillResponse {
-  const trimmed = content.trim()
-  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/)
-  const jsonText = fenced ? fenced[1].trim() : trimmed
-  return JSON.parse(jsonText) as RawDistillResponse
+function clampConfidence(value: number): number {
+  return Math.max(0, Math.min(1, Math.round(value * 100) / 100))
 }
 
-function stringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) return []
-  return value.filter((v): v is string => typeof v === 'string' && v.trim().length > 0).map((v) => v.trim())
-}
-
-function clampConfidence(value: unknown): number {
-  const n = typeof value === 'number' ? value : 0.5
-  return Math.max(0, Math.min(1, Math.round(n * 100) / 100))
-}
-
-function normalizeEntities(value: unknown): EntityRef[] {
-  if (!Array.isArray(value)) return []
+function normalizeEntities(value: DistillEvent['entities']): EntityRef[] {
   const result: EntityRef[] = []
   for (const item of value) {
-    if (!item || typeof item !== 'object') continue
-    const obj = item as Record<string, unknown>
-    const type = obj.type
-    const name = obj.name
-    if (
-      (type === 'person' || type === 'project' || type === 'document' || type === 'url') &&
-      typeof name === 'string' &&
-      name.trim().length > 0
-    ) {
-      result.push({
-        type,
-        name: name.trim(),
-        value: typeof obj.value === 'string' ? obj.value : undefined,
-        confidence: clampConfidence(obj.confidence)
-      })
-    }
+    const name = item.name.trim()
+    if (name.length === 0) continue
+    result.push({
+      type: item.type,
+      name,
+      value: item.value,
+      confidence: clampConfidence(item.confidence)
+    })
   }
   return result
 }
 
-function normalizeEvidence(value: unknown, allowedSegmentIds: Set<string>): EvidenceRef[] {
-  if (!Array.isArray(value)) return []
+function normalizeEvidence(
+  value: DistillEvent['evidenceRefs'],
+  allowedSegmentIds: Set<string>
+): EvidenceRef[] {
   const result: EvidenceRef[] = []
   for (const item of value) {
-    if (!item || typeof item !== 'object') continue
-    const obj = item as Record<string, unknown>
-    if (typeof obj.segmentId !== 'string' || !allowedSegmentIds.has(obj.segmentId)) continue
+    if (!allowedSegmentIds.has(item.segmentId)) continue
     result.push({
-      segmentId: obj.segmentId,
-      quote: typeof obj.quote === 'string' ? obj.quote.slice(0, 300) : '',
-      reason: typeof obj.reason === 'string' ? obj.reason.slice(0, 160) : ''
+      segmentId: item.segmentId,
+      quote: item.quote.slice(0, 300),
+      reason: item.reason.slice(0, 160)
     })
   }
   return result
 }
 
 function normalizeEvent(
-  raw: RawDistillEvent,
+  raw: DistillEvent,
   date: string,
   hourBucket: string,
   allowedSegmentIds: Set<string>,
   modelName: string
 ): CleanEpisode | null {
-  const title = typeof raw.title === 'string' ? raw.title.trim() : ''
-  const summary = typeof raw.summary === 'string' ? raw.summary.trim() : ''
+  const title = raw.title.trim()
+  const summary = raw.summary.trim()
   if (!title || !summary) return null
 
-  const segmentIds = stringArray(raw.segmentIds).filter((id) => allowedSegmentIds.has(id))
+  const segmentIds = raw.segmentIds.filter((id) => allowedSegmentIds.has(id))
   if (segmentIds.length === 0) return null
-
-  const memoryKind = VALID_MEMORY_KINDS.has(raw.memoryKind as MemoryKind)
-    ? raw.memoryKind as MemoryKind
-    : 'work'
-  const sourceQuality = VALID_SOURCE_QUALITY.has(raw.sourceQuality as SourceQuality)
-    ? raw.sourceQuality as SourceQuality
-    : 'medium'
-  const wikiStatus = VALID_WIKI_STATUS.has(raw.wikiStatus as WikiStatus)
-    ? raw.wikiStatus as WikiStatus
-    : raw.wikiEligible === true
-      ? 'candidate'
-      : 'none'
 
   const ts = nowIso()
   return {
     id: randomUUID(),
     date,
     hourBucket,
-    startTime: typeof raw.startTime === 'string' ? raw.startTime : `${hourBucket.slice(0, 2)}:00:00`,
-    endTime: typeof raw.endTime === 'string' ? raw.endTime : `${hourBucket.slice(0, 2)}:59:59`,
+    startTime: raw.startTime,
+    endTime: raw.endTime,
     title,
     summary,
-    memoryKind,
-    project: typeof raw.project === 'string' ? raw.project.trim() : '',
+    memoryKind: raw.memoryKind,
+    project: raw.project.trim(),
     entities: normalizeEntities(raw.entities),
-    topics: stringArray(raw.topics).slice(0, 12),
-    materials: stringArray(raw.materials).slice(0, 12),
-    outputs: stringArray(raw.outputs).slice(0, 12),
-    todos: stringArray(raw.todos).slice(0, 12),
-    blockers: stringArray(raw.blockers).slice(0, 8),
+    topics: raw.topics.slice(0, 12),
+    materials: raw.materials.slice(0, 12),
+    outputs: raw.outputs.slice(0, 12),
+    todos: raw.todos.slice(0, 12),
+    blockers: raw.blockers.slice(0, 8),
     segmentIds,
     evidenceRefs: normalizeEvidence(raw.evidenceRefs, allowedSegmentIds),
-    sourceQuality,
+    sourceQuality: raw.sourceQuality,
     confidence: clampConfidence(raw.confidence),
-    reportEligible: raw.reportEligible !== false,
-    wikiEligible: raw.wikiEligible === true,
-    wikiStatus,
+    reportEligible: raw.reportEligible,
+    wikiEligible: raw.wikiEligible,
+    wikiStatus: raw.wikiStatus,
     createdAt: ts,
     updatedAt: ts,
     modelName,
     distillVersion: DISTILL_VERSION
+  }
+}
+
+/** 多数投票计算主导 activityType（忽略 undefined/idle） */
+function dominantActivityType(segments: WorkSegment[]): string | undefined {
+  const counts = new Map<string, number>()
+  for (const s of segments) {
+    if (s.activityType && s.activityType !== 'idle') {
+      counts.set(s.activityType, (counts.get(s.activityType) ?? 0) + 1)
+    }
+  }
+  if (counts.size === 0) return undefined
+  let best: string | undefined
+  let bestCount = 0
+  for (const [type, count] of counts) {
+    if (count > bestCount) {
+      best = type
+      bestCount = count
+    }
+  }
+  return best
+}
+
+/** 多数投票计算主导 contentType（忽略 undefined/other） */
+function dominantContentType(segments: WorkSegment[]): string | undefined {
+  const counts = new Map<string, number>()
+  for (const s of segments) {
+    if (s.contentType && s.contentType !== 'other') {
+      counts.set(s.contentType, (counts.get(s.contentType) ?? 0) + 1)
+    }
+  }
+  if (counts.size === 0) return undefined
+  let best: string | undefined
+  let bestCount = 0
+  for (const [type, count] of counts) {
+    if (count > bestCount) {
+      best = type
+      bestCount = count
+    }
+  }
+  return best
+}
+
+/** 从 AI 输出事件 + CleanEpisode 构造 MemCell */
+function buildMemCell(event: DistillEvent, cleanEpisode: CleanEpisode): MemCell {
+  const segments = SegmentRepository.getByIds(cleanEpisode.segmentIds)
+  const activityType = dominantActivityType(segments)
+  const contentType = dominantContentType(segments)
+
+  const episode = (event.episode ?? '').trim() || cleanEpisode.summary
+  const facts = (event.facts ?? [])
+    .map((f) => f.trim())
+    .filter((f) => f.length > 0)
+  const foresight = (event.foresight ?? [])
+    .map((f) => ({
+      statement: f.statement.trim(),
+      validFrom: f.validFrom,
+      validTo: f.validTo,
+      confidence: clampConfidence(f.confidence)
+    }))
+    .filter((f) => f.statement.length > 0)
+
+  const ts = nowIso()
+  return {
+    id: randomUUID(),
+    cleanEpisodeId: cleanEpisode.id,
+    episode,
+    facts,
+    foresight,
+    metadata: {
+      segmentIds: cleanEpisode.segmentIds,
+      timestamp: ts,
+      confidence: cleanEpisode.confidence,
+      activityType,
+      contentType
+    },
+    createdAt: ts
   }
 }
 
@@ -342,34 +351,100 @@ export class DistillManager {
     })
 
     try {
-      const result = await OpenAIClient.chatCompletion({
+      const baseParams = {
         baseUrl: apiConfig.baseUrl,
         apiKey: apiConfig.apiKey,
         model: apiConfig.model,
+        temperature: 0.2,
+        maxTokens: 4096,
+        responseFormat: { type: 'json_object' as const }
+      }
+
+      const result = await OpenAIClient.chatCompletion({
+        ...baseParams,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: masked.text }
-        ],
-        temperature: 0.2,
-        maxTokens: 4096
+        ]
       })
 
-      const parsed = parseJsonFromModel(result.content)
-      if (!Array.isArray(parsed.events)) {
-        throw new Error('AI JSON 缺少 events 数组')
+      let { events, skipped } = parseDistillResponse(result.content)
+
+      if (events.length === 0 && skipped > 0) {
+        const retryText =
+          masked.text +
+          '\n\n上次返回无法解析（' +
+          skipped +
+          ' 条被跳过），请严格输出 JSON 对象，第一个字符必须是 {'
+        const retryResult = await OpenAIClient.chatCompletion({
+          ...baseParams,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: retryText }
+          ]
+        })
+        const retryParsed = parseDistillResponse(retryResult.content)
+        events = retryParsed.events
+        skipped = retryParsed.skipped
       }
+
       const allowedSegmentIds = new Set(pack.segmentIds)
-      const cleanEpisodes = parsed.events
-        .map((event) => normalizeEvent(event as RawDistillEvent, date, hourBucket, allowedSegmentIds, apiConfig.model))
-        .filter((event): event is CleanEpisode => event !== null)
-      if (cleanEpisodes.length === 0) {
-        throw new Error('AI JSON 未产生可写入的工作记忆事件')
+      const pairs = events
+        .map((event) => ({
+          event,
+          cleanEpisode: normalizeEvent(event, date, hourBucket, allowedSegmentIds, apiConfig.model)
+        }))
+        .filter(
+          (pair): pair is { event: DistillEvent; cleanEpisode: CleanEpisode } =>
+            pair.cleanEpisode !== null
+        )
+      if (pairs.length === 0) {
+        const errorMessage = `AI JSON 解析失败，跳过 ${skipped} 条`
+        upsertRun(date, hourBucket, {
+          status: 'failed',
+          segmentIds: pack.segmentIds,
+          modelName: apiConfig.model,
+          errorMessage
+        })
+        return { created: 0, skipped: false, message: errorMessage }
+      }
+
+      // 清理旧 MemCell（避免外键约束阻止 CleanEpisode 删除）
+      try {
+        const db = getDatabase()
+        db.prepare(
+          `DELETE FROM memory_cells WHERE clean_episode_id IN (
+            SELECT id FROM clean_episodes WHERE date = ? AND hour_bucket = ?
+          )`
+        ).run(date, hourBucket)
+      } catch (e) {
+        console.warn(
+          '[DistillManager] 清理旧 MemCell 失败:',
+          e instanceof Error ? e.message : String(e)
+        )
       }
 
       CleanEpisodeRepository.deleteByHour(date, hourBucket)
-      for (const event of cleanEpisodes) {
-        CleanEpisodeRepository.insert(event)
+      for (const { cleanEpisode } of pairs) {
+        CleanEpisodeRepository.insert(cleanEpisode)
       }
+
+      // 写入 MemCell（错误隔离：失败不阻塞 CleanEpisode 写入）
+      for (const { event, cleanEpisode } of pairs) {
+        try {
+          const memCell = buildMemCell(event, cleanEpisode)
+          MemCellRepository.insert(memCell)
+          // 通知 MemCellIndexer 异步生成 embedding（事件发射同步、监听器内部异步处理，
+          // 任何异常都被监听器自身捕获，不会影响主流程）
+          memCellEventBus.emit(MEMCELL_CREATED_EVENT, memCell)
+        } catch (e) {
+          console.error(
+            '[DistillManager] MemCell 写入失败:',
+            e instanceof Error ? e.message : String(e)
+          )
+        }
+      }
+
       SettingsStore.set({ aiDistillLastRunAt: nowIso() })
       upsertRun(date, hourBucket, {
         status: 'success',
@@ -377,7 +452,7 @@ export class DistillManager {
         modelName: apiConfig.model,
         errorMessage: ''
       })
-      return { created: cleanEpisodes.length, skipped: false, message: `已生成 ${cleanEpisodes.length} 条工作记忆事件` }
+      return { created: pairs.length, skipped: false, message: `已生成 ${pairs.length} 条工作记忆事件` }
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e)
       upsertRun(date, hourBucket, {

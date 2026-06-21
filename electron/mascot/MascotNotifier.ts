@@ -8,7 +8,9 @@
  *  - 实现完整频率限制逻辑（每天最多 2 次；10 分钟内 3 次关闭则当天停止）
  *  - 不弹窗，仅日志记录（Null Object 模式，非 mock）
  *  - 阶段 10 替换为真实 MascotManager 后，频率限制由真实实现接管
+ *  - notifyAdvice：接收 ProactiveAdvisor 产出的 Advice 并通过气泡推送（Task R4）
  */
+import type { Advice } from '../ai/ProactiveAdvisor'
 
 /** 气泡动作（点击气泡后跳转目标） */
 export interface MascotBubbleAction {
@@ -46,6 +48,14 @@ export interface IMascotNotifier {
 
   /** 重置当天频率限制（跨日时调用） */
   resetDailyLimit(): void
+
+  /**
+   * 接收 ProactiveAdvisor 产出的 Advice 并通过气泡推送（Task R4）。
+   * 内部将 Advice 映射为 MascotBubblePayload 并调用 tryShowBubble。
+   * @param advice 主动建议对象
+   * @returns true 表示已展示（或日志记录）；false 表示被频率限制拦截
+   */
+  notifyAdvice(advice: Advice): boolean
 }
 
 /** 每天主动气泡最大次数 */
@@ -123,6 +133,26 @@ export class SafeMascotNotifier implements IMascotNotifier {
     this.dailyDate = this.todayString()
   }
 
+  notifyAdvice(advice: Advice): boolean {
+    // 将 Advice 映射为 MascotBubblePayload
+    // skill_reference → insight；rest_reminder / focus_suggestion → reminder
+    const bubbleType: MascotBubbleType =
+      advice.type === 'skill_reference' ? 'insight' : 'reminder'
+    const payload: MascotBubblePayload = {
+      type: bubbleType,
+      title: advice.title,
+      message: advice.message
+    }
+    if (advice.action) {
+      // skill_reference 跳转到技能卡页面；其余建议跳转到反思页
+      payload.action = {
+        type: 'navigate',
+        page: advice.type === 'skill_reference' ? 'skills' : 'reflection'
+      }
+    }
+    return this.tryShowBubble(payload)
+  }
+
   /** 跨日重置检测 */
   private checkDailyReset(): void {
     const today = this.todayString()
@@ -154,4 +184,16 @@ export function getMascotNotifier(): IMascotNotifier {
 /** 注入真实 MascotNotifier（阶段 10 调用） */
 export function setMascotNotifier(notifier: IMascotNotifier): void {
   notifierInstance = notifier
+}
+
+/**
+ * 推送主动建议到桌面伙伴（Task R4）。
+ *
+ * 使用当前 MascotNotifier 单例将 Advice 转换为气泡并展示。
+ * 受频率限制约束（每天最多 2 次；10 分钟内 3 次关闭则当天停止）。
+ * @param advice 主动建议对象
+ * @returns true 表示已展示（或日志记录）；false 表示被频率限制拦截
+ */
+export function notifyAdvice(advice: Advice): boolean {
+  return getMascotNotifier().notifyAdvice(advice)
 }

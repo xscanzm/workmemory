@@ -26,7 +26,7 @@ const voidSchema = z.undefined()
 
 /* ===================== 枚举 ===================== */
 
-const reportTemplateEnum = z.enum(['enhanced', 'concise', 'okr'])
+const reportTemplateEnum = z.enum(['enhanced', 'concise', 'okr', 'structured'])
 const sourceQualityEnum = z.enum(['high', 'medium', 'low', 'failed', 'private'])
 const memoryKindEnum = z.enum([
   'work',
@@ -573,5 +573,16 @@ export const systemSchemas = {
 
 export const searchSchemas = {
   /** FTS5 全文搜索：入参为非空查询字符串 */
-  Fts: z.object({ query: z.string().min(1) })
+  Fts: z.object({ query: z.string().min(1) }),
+  /** 混合检索：FTS5 关键词 + 语义向量，入参为查询字符串 + 可选权重/limit */
+  Hybrid: z.object({
+    query: z.string().min(1),
+    options: z
+      .object({
+        limit: z.number().int().min(1).max(100).optional(),
+        keywordWeight: z.number().min(0).optional(),
+        semanticWeight: z.number().min(0).optional()
+      })
+      .optional()
+  })
 } as const

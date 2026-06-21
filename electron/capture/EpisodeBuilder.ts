@@ -17,9 +17,16 @@
  */
 import { EventEmitter } from 'node:events'
 import { randomUUID } from 'node:crypto'
-import type { Episode, WorkSegment } from '@/types'
+import type { Episode, WorkSegment, ActivityType } from '@/types'
 import { SegmentRepository } from '../db/repositories/SegmentRepository'
 import { EpisodeRepository } from '../db/repositories/EpisodeRepository'
+import {
+  CHINESE_MENU_WORDS,
+  ENGLISH_MENU_WORDS,
+  CHINESE_BUTTON_WORDS,
+  ENGLISH_BUTTON_WORDS,
+  NETWORK_INDICATOR_WORDS
+} from '../ocr/OcrTextCleaner'
 
 /** 时间连续性阈值（秒）：相邻 Segment 时间差 <5 分钟 */
 const TIME_CONTINUITY_THRESHOLD_SEC = 5 * 60
@@ -57,6 +64,19 @@ const ENGLISH_STOPWORDS = new Set([
   'not', 'no', 'yes', 'if', 'then', 'else', 'when', 'where', 'why', 'how',
   'all', 'any', 'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such',
   'only', 'own', 'same', 'so', 'than', 'too', 'very', 'just', 'now'
+])
+
+/**
+ * UI 噪声词集合（中文原样 + 英文小写）。
+ * 复用 OcrTextCleaner 的噪声词表，用于 extractKeywords / generateTitle /
+ * generateOneLineSummary 过滤 UI 通用噪声，避免生成无意义的关键词拼接。
+ */
+const UI_NOISE_WORDS: Set<string> = new Set<string>([
+  ...CHINESE_MENU_WORDS,
+  ...CHINESE_BUTTON_WORDS,
+  ...NETWORK_INDICATOR_WORDS,
+  ...ENGLISH_MENU_WORDS.map(w => w.toLowerCase()),
+  ...ENGLISH_BUTTON_WORDS.map(w => w.toLowerCase())
 ])
 
 /** 动作词映射（用于 one_line_summary 生成） */
@@ -243,6 +263,13 @@ export class EpisodeBuilder extends EventEmitter {
 
   /** 判断两个 Cluster 是否语义相似 */
   private isSemanticallySimilar(a: SegmentCluster, b: SegmentCluster): boolean {
+    // activityType 感知：两个聚类都有非 idle 的主导 activityType 且不同 → 不合并
+    // （如 reading 代码文档 vs coding 写代码，即使关键词重叠也不误合并）
+    // 其中一方为 undefined 或 idle 时，向后兼容，不影响现有判断
+    const activityA = this.getDominantActivityType(a)
+    const activityB = this.getDominantActivityType(b)
+    if (activityA && activityB && activityA !== activityB) return false
+
     // 共享任务单号 → 相似
     for (const taskId of a.taskIds) {
       if (b.taskIds.has(taskId)) return true
@@ -269,6 +296,32 @@ export class EpisodeBuilder extends EventEmitter {
     for (const a of source.apps) target.apps.add(a)
   }
 
+  /**
+   * 计算聚类的主导 activityType。
+   * 多数投票：忽略 undefined 和 'idle'，取出现次数最多的 activityType；
+   * 若全部为 undefined/idle，则返回 undefined。
+   */
+  private getDominantActivityType(cluster: SegmentCluster): ActivityType | undefined {
+    const counts = new Map<ActivityType, number>()
+    for (const segment of cluster.segments) {
+      const at = segment.activityType
+      if (at && at !== 'idle') {
+        counts.set(at, (counts.get(at) ?? 0) + 1)
+      }
+    }
+    if (counts.size === 0) return undefined
+
+    let best: ActivityType | undefined
+    let bestCount = 0
+    for (const [at, count] of counts) {
+      if (count > bestCount) {
+        best = at
+        bestCount = count
+      }
+    }
+    return best
+  }
+
   // ===================== Episode 生成 =====================
 
   /** 从 Cluster 创建 Episode */
@@ -287,6 +340,9 @@ export class EpisodeBuilder extends EventEmitter {
     // 生成 one_line_summary
     const oneLineSummary = this.generateOneLineSummary(cluster)
 
+    // 聚类内多数 segment 的 activityType（忽略 undefined/idle）
+    const dominantActivityType = this.getDominantActivityType(cluster)
+
     return {
       id: randomUUID(),
       date,
@@ -299,13 +355,16 @@ export class EpisodeBuilder extends EventEmitter {
       topics,
       userEdited: false,
       reportEligible: true,
-      wikiEligible: false
+      wikiEligible: false,
+      dominantActivityType
     }
   }
 
   /**
    * 生成 Episode title。
    * 规则：若能提取任务单号/项目名 → "[项目名] 主题"；否则取最频繁应用 + 关键词组合。
+   * 降级：当关键词均为 UI 噪声词或为空，且无任务单号/项目名时，
+   *      退化到 `${appName} - ${windowTitle前20字}`，避免无意义的关键词拼接。
    */
   private generateTitle(cluster: SegmentCluster): string {
     const segments = cluster.segments
@@ -330,8 +389,9 @@ export class EpisodeBuilder extends EventEmitter {
       }
     }
 
-    // 提取主题关键词（取 top 2-3）
-    const topKeywords = [...cluster.keywords].slice(0, 3).join('')
+    // 提取主题关键词（过滤 UI 噪声词后取 top 2-3）
+    const meaningfulKeywords = [...cluster.keywords].filter(k => !UI_NOISE_WORDS.has(k))
+    const topKeywords = meaningfulKeywords.slice(0, 3).join('')
 
     if (projectName && topKeywords) {
       return `[${projectName}] ${topKeywords}`
@@ -349,6 +409,7 @@ export class EpisodeBuilder extends EventEmitter {
     // 从窗口标题提取关键词
     const titleKeywords = this.extractTitleKeywords(segments)
 
+    // 关键词均为 UI 噪声或为空 → 降级到 appName - windowTitle前20字
     if (dominantApp && titleKeywords) {
       return `${dominantApp} - ${titleKeywords}`
     } else if (dominantApp) {
@@ -369,6 +430,8 @@ export class EpisodeBuilder extends EventEmitter {
     const longestTitle = titles.sort((a, b) => b.length - a.length)[0]
     // 去除应用名后缀（如 " - Google Chrome", " - Visual Studio Code"）
     const cleaned = longestTitle.replace(/\s*-\s*[^-]+$/, '').trim()
+    // 去除后缀后若为空，返回空字符串（避免返回应用名本身）
+    if (cleaned === '') return ''
     // 取前 20 字
     return cleaned.slice(0, 20)
   }
@@ -376,6 +439,8 @@ export class EpisodeBuilder extends EventEmitter {
   /**
    * 生成 one_line_summary。
    * 规则：基于 OCR 文本提取核心动作 + 对象，组合成一句话。
+   * 降级：当无动作词且关键词均为 UI 噪声或为空时，返回 `查看 ${appName} 相关内容`，
+   *      避免输出无意义的 "推进关键词"。
    */
   private generateOneLineSummary(cluster: SegmentCluster): string {
     const segments = cluster.segments
@@ -391,8 +456,9 @@ export class EpisodeBuilder extends EventEmitter {
       }
     }
 
-    // 提取主题对象（top 关键词）
-    const topKeywords = [...cluster.keywords].slice(0, 3).join('')
+    // 提取主题对象（top 关键词，过滤 UI 噪声词）
+    const meaningfulKeywords = [...cluster.keywords].filter(k => !UI_NOISE_WORDS.has(k))
+    const topKeywords = meaningfulKeywords.slice(0, 3).join('')
 
     // 提取项目名
     let projectName = ''
@@ -400,6 +466,21 @@ export class EpisodeBuilder extends EventEmitter {
     if (taskIds.length > 0) {
       const prefix = taskIds[0].split('-')[0]
       projectName = TASK_PREFIX_TO_PROJECT[prefix] || prefix
+    }
+
+    // 提取主导应用名（用于降级文案）
+    const appCounts = new Map<string, number>()
+    for (const segment of segments) {
+      appCounts.set(segment.appName, (appCounts.get(segment.appName) ?? 0) + 1)
+    }
+    const dominantApp = [...appCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? ''
+
+    // 降级：无动作词且无有意义关键词 → 查看 ${appName} 相关内容
+    if (actions.length === 0 && !topKeywords) {
+      if (dominantApp) {
+        return `查看 ${dominantApp} 相关内容`
+      }
+      return '查看相关内容'
     }
 
     // 组合一句话
@@ -470,7 +551,7 @@ export class EpisodeBuilder extends EventEmitter {
 
 /**
  * 提取关键词。
- * 分词：中文按字 + 双字组合，英文按空格 → 去停用词 → TF 排序 top10。
+ * 分词：中文按字 + 双字组合，英文按空格 → 去停用词 + UI 噪声词 → TF 排序 top10。
  */
 export function extractKeywords(text: string): string[] {
   if (!text || text.trim().length === 0) return []
@@ -491,7 +572,10 @@ export function extractKeywords(text: string): string[] {
     for (let i = 0; i < segment.length - 1; i++) {
       const bigram = segment.slice(i, i + 2)
       if (!CHINESE_STOPWORDS.has(bigram[0]) && !CHINESE_STOPWORDS.has(bigram[1])) {
-        freq.set(bigram, (freq.get(bigram) ?? 0) + 1)
+        // 过滤 UI 噪声双字词（如 文件/编辑/视图/确定/取消 等）
+        if (!UI_NOISE_WORDS.has(bigram)) {
+          freq.set(bigram, (freq.get(bigram) ?? 0) + 1)
+        }
       }
     }
   }
@@ -501,7 +585,10 @@ export function extractKeywords(text: string): string[] {
   for (const word of englishWords) {
     const lower = word.toLowerCase()
     if (!ENGLISH_STOPWORDS.has(lower) && lower.length >= 2) {
-      freq.set(lower, (freq.get(lower) ?? 0) + 1)
+      // 过滤 UI 噪声英文词（如 file/edit/view/ok/cancel 等，大小写不敏感）
+      if (!UI_NOISE_WORDS.has(lower)) {
+        freq.set(lower, (freq.get(lower) ?? 0) + 1)
+      }
     }
   }
 

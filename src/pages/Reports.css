@@ -184,6 +184,54 @@
   text-align: center;
 }
 
+/* ============================ 结构化日报预览（RP1.7） ============================ */
+.wm-reports-structured {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wm-spacing-md);
+}
+
+.wm-reports-structured-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0 0 var(--wm-spacing-sm);
+  color: var(--wm-color-text-primary);
+  padding-bottom: var(--wm-spacing-sm);
+  border-bottom: 2px solid var(--wm-color-accent, #4f8cff);
+}
+
+.wm-reports-structured-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wm-spacing-xs);
+  padding: var(--wm-spacing-sm) var(--wm-spacing-md);
+  background: var(--wm-color-surface-2, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--wm-color-border);
+  border-radius: 8px;
+}
+
+.wm-reports-structured-section-heading {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--wm-color-accent, #4f8cff);
+  letter-spacing: 0.3px;
+}
+
+.wm-reports-structured-section-body {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--wm-color-text-primary);
+}
+
+.wm-reports-structured-section-body :first-child {
+  margin-top: 0;
+}
+
+.wm-reports-structured-section-body :last-child {
+  margin-bottom: 0;
+}
+
 /* ============================ 右侧历史列表 ============================ */
 .wm-reports-history {
   width: 280px;
