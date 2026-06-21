@@ -391,3 +391,26 @@ export type ContentType =
   | 'forum'
   | 'product'
   | 'other'
+
+/**
+ * UI 布局类型（由 LayoutAnalyzer 基于 OCR 块坐标分布推断）。
+ * other 为置信度不足时的默认兜底值。
+ */
+export type LayoutType =
+  | 'form'
+  | 'list'
+  | 'article'
+  | 'editor'
+  | 'chat'
+  | 'dashboard'
+  | 'other'
+
+/**
+ * 布局区域（由 LayoutAnalyzer 提取的结构化区域）。
+ * type 如 'button'/'input'/'label'/'paragraph'/'bubble'/'avatar'/'card'/'list-item'/'code-line' 等。
+ */
+export interface LayoutRegion {
+  type: string
+  bounds: BoundsRect
+  text: string
+}
