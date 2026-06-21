@@ -1,0 +1,9 @@
+# PP-OCRv6 tiny runtime and bundled model cache live here.
+#
+# 用户需将 PP-OCRv6 编译产物放置到此目录：
+#   resources/ocr/ppocr_cli.exe      (PP-OCRv6 CLI 可执行文件)
+#   resources/ocr/models/tiny/       (tiny 模型)
+#   resources/ocr/models/base/       (base 模型)
+#
+# 打包时此目录通过 electron-builder extraResources 复制到
+# 安装目录的 resources/resources/ocr/，供 PpOcrEngine 运行时加载。

@@ -1,0 +1,48 @@
+/* 自定义标题栏样式：可拖拽区域 + 窗口控制按钮 */
+.titlebar {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--wm-spacing-sm);
+  background: var(--wm-color-surface);
+  border-bottom: 1px solid var(--wm-color-border);
+  -webkit-app-region: drag;
+  flex-shrink: 0;
+  z-index: var(--wm-z-titlebar);
+}
+
+.drag {
+  display: flex;
+  align-items: baseline;
+  gap: var(--wm-spacing-sm);
+  padding-left: var(--wm-spacing-xs);
+}
+
+.logo {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--wm-color-accent);
+  letter-spacing: 0.3px;
+}
+
+.sub {
+  font-size: 11px;
+  color: var(--wm-color-text-muted);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  -webkit-app-region: no-drag;
+}
+
+.closeBtn {
+  border-radius: var(--wm-radius-button);
+}
+
+.closeBtn:hover {
+  background-color: var(--wm-color-danger);
+  color: #fff;
+}

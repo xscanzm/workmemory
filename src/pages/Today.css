@@ -1,0 +1,240 @@
+/* Today 页面样式 — 精品桌面产品视觉重构（全局类名） */
+
+.wm-today {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wm-spacing-lg);
+  max-width: 880px;
+  margin: 0 auto;
+}
+
+/* ============================ 顶部汇总卡 ============================ */
+.wm-today-summary-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--wm-spacing-lg);
+  flex-wrap: wrap;
+}
+
+.wm-today-summary-left {
+  display: flex;
+  align-items: center;
+  gap: var(--wm-spacing-md);
+  min-width: 0;
+}
+
+.wm-today-date {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.wm-today-date-main {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--wm-color-text-primary);
+  letter-spacing: 0.3px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wm-today-date-sub {
+  font-size: 11px;
+  color: var(--wm-color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.wm-today-summary-stats {
+  display: flex;
+  align-items: center;
+  gap: var(--wm-spacing-md);
+}
+
+.wm-today-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 56px;
+}
+
+.wm-today-stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--wm-color-accent);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.wm-today-stat-label {
+  font-size: 11px;
+  color: var(--wm-color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.wm-today-stat-divider {
+  width: 1px;
+  height: 28px;
+  background: var(--wm-color-border);
+  flex-shrink: 0;
+}
+
+.wm-today-summary-right {
+  display: flex;
+  align-items: center;
+  gap: var(--wm-spacing-sm);
+  flex-shrink: 0;
+}
+
+/* ============================ 每日总结卡 ============================ */
+.wm-today-daily-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wm-spacing-sm);
+}
+
+.wm-today-daily-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--wm-spacing-sm);
+}
+
+.wm-today-daily-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--wm-color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.wm-today-daily-text {
+  font-size: 14px;
+  color: var(--wm-color-text-primary);
+  line-height: 1.6;
+  cursor: pointer;
+  padding: var(--wm-spacing-xs) 0;
+  min-height: 22px;
+  word-break: break-word;
+}
+
+.wm-today-daily-edit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wm-spacing-sm);
+}
+
+.wm-today-daily-textarea {
+  width: 100%;
+  min-height: 60px;
+  padding: var(--wm-spacing-sm);
+  font-size: 14px;
+  line-height: 1.6;
+  border: 1px solid var(--wm-color-accent);
+  border-radius: var(--wm-radius-button);
+  resize: vertical;
+  font-family: inherit;
+  color: var(--wm-color-text-primary);
+  background: var(--wm-color-surface);
+  outline: none;
+  box-shadow: 0 0 0 2px var(--wm-color-accent-soft);
+}
+
+.wm-today-daily-actions {
+  display: flex;
+  gap: var(--wm-spacing-sm);
+}
+
+/* ============================ 时间轴区域 ============================ */
+.wm-today-timeline-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wm-spacing-md);
+}
+
+.wm-today-section-header {
+  display: flex;
+  align-items: center;
+  gap: var(--wm-spacing-sm);
+}
+
+.wm-today-section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--wm-color-text-secondary);
+  margin: 0;
+}
+
+.wm-today-loading {
+  display: flex;
+  align-items: center;
+  gap: var(--wm-spacing-sm);
+  padding: var(--wm-spacing-xl);
+  color: var(--wm-color-text-muted);
+  font-size: 13px;
+}
+
+.wm-today-loading-spinner {
+  animation: wm-today-spin 0.8s linear infinite;
+  color: var(--wm-color-accent);
+}
+
+@keyframes wm-today-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ============================ 时间轴 MemoryCard 适配 ============================
+ * MemoryCard 自带左侧 timeline-rail，在 Timeline/TimelineItem 容器内会与外层轨道重叠。
+ * 此处隐藏 MemoryCard 内置轨道，由 TimelineItem 提供统一的时间轴轨道与连接线。
+ */
+.wm-today-timeline .wm-ui-memorycard {
+  gap: 0;
+  padding: var(--wm-spacing-md);
+}
+
+.wm-today-timeline .wm-ui-memorycard .wm-ui-timeline-rail {
+  display: none;
+}
+
+/* MemoryCard 标题与摘要防溢出 */
+.wm-today-timeline .wm-ui-memorycard-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wm-today-timeline .wm-ui-memorycard-summary {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ============================ 响应式 ============================ */
+@media (max-width: 760px) {
+  .wm-today-summary-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--wm-spacing-md);
+  }
+  .wm-today-summary-left {
+    justify-content: space-between;
+  }
+  .wm-today-summary-stats {
+    justify-content: space-around;
+  }
+  .wm-today-summary-right {
+    justify-content: stretch;
+  }
+  .wm-today-summary-right .wm-ui-button {
+    width: 100%;
+  }
+}

@@ -1,0 +1,539 @@
+/* Wiki 页面样式（含从 inline <style> 迁移的样式，全局类名） */
+
+.wm-wiki {
+  display: flex;
+  height: 100%;
+  gap: var(--wm-spacing-md);
+  min-height: 0;
+}
+
+.wm-wiki-sidebar {
+  width: 200px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--wm-spacing-sm);
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.wm-wiki-dir {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wm-spacing-sm);
+}
+
+.wm-wiki-dir-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wm-wiki-dir-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--wm-color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.wm-wiki-dir-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--wm-color-text-muted);
+}
+
+.wm-wiki-dir-label {
+  flex: 1;
+}
+
+.wm-wiki-dir-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0;
+  margin: 0;
+}
+
+.wm-wiki-dir-item {
+  padding: 5px 10px 5px 28px;
+  font-size: 12px;
+  color: var(--wm-color-text-secondary);
+  border-radius: var(--wm-radius-button);
+  cursor: pointer;
+  transition: all 0.12s;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wm-wiki-dir-item:hover {
+  background: var(--wm-color-surface-alt);
+  color: var(--wm-color-text-primary);
+}
+
+.wm-wiki-dir-item-active {
+  background: rgba(34, 181, 106, 0.12);
+  color: var(--wm-color-success);
+  font-weight: 500;
+}
+
+.wm-wiki-dir-empty {
+  font-size: 11px;
+  color: var(--wm-color-text-muted);
+  padding: var(--wm-spacing-sm);
+  line-height: 1.6;
+}
+
+.wm-wiki-editor {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.wm-wiki-review {
+  width: 260px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--wm-spacing-sm);
+}
+
+.wm-wiki-review-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: var(--wm-spacing-sm);
+  border-bottom: 1px solid var(--wm-color-border);
+}
+
+.wm-wiki-review-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--wm-color-text-secondary);
+  flex: 1;
+}
+
+.wm-wiki-review-empty {
+  padding: var(--wm-spacing-lg);
+  text-align: center;
+  font-size: 12px;
+  color: var(--wm-color-text-muted);
+  line-height: 1.6;
+}
+
+.wm-wiki-review-empty-hint {
+  font-size: 11px;
+  margin-top: 6px;
+  opacity: 0.7;
+}
+
+.wm-wiki-review-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wm-spacing-sm);
+}
+
+.wm-wiki-edit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wm-spacing-md);
+}
+
+.wm-wiki-edit-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--wm-spacing-sm);
+  flex-wrap: wrap;
+}
+
+.wm-wiki-edit-toolbar-left,
+.wm-wiki-edit-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: var(--wm-spacing-sm);
+}
+
+.wm-wiki-type-select {
+  min-width: 120px;
+}
+
+.wm-wiki-type-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.wm-wiki-title-input {
+  width: 100%;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--wm-color-text-primary);
+  border: none;
+  border-bottom: 2px solid var(--wm-color-border);
+  padding: 4px 0;
+  background: transparent;
+  outline: none;
+  transition: border-color 0.12s;
+}
+
+.wm-wiki-title-input:focus {
+  border-bottom-color: var(--wm-color-success);
+}
+
+.wm-wiki-aliases {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--wm-spacing-sm);
+}
+
+.wm-wiki-field-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--wm-color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  min-width: 60px;
+  padding-top: 5px;
+}
+
+.wm-wiki-alias-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  flex: 1;
+  align-items: center;
+}
+
+.wm-wiki-alias-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.wm-wiki-alias-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  opacity: 0.6;
+  cursor: pointer;
+  transition: opacity 0.12s;
+}
+
+.wm-wiki-alias-remove:hover {
+  opacity: 1;
+}
+
+.wm-wiki-alias-input {
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  color: var(--wm-color-text-primary);
+  outline: none;
+  min-width: 100px;
+  padding: 2px 0;
+}
+
+.wm-wiki-edit-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wm-spacing-md);
+}
+
+.wm-wiki-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wm-wiki-field-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.wm-wiki-field-textarea {
+  width: 100%;
+  padding: var(--wm-spacing-sm);
+  font-size: 13px;
+  line-height: 1.6;
+  border: 1px solid var(--wm-color-border);
+  border-radius: var(--wm-radius-button);
+  resize: vertical;
+  font-family: inherit;
+  color: var(--wm-color-text-primary);
+  background: var(--wm-color-surface);
+  outline: none;
+  transition: border-color 0.12s;
+}
+
+.wm-wiki-field-textarea:focus {
+  border-color: var(--wm-color-success);
+}
+
+.wm-wiki-field-oneline {
+  min-height: 40px;
+}
+
+.wm-wiki-list-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wm-wiki-list-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.wm-wiki-list-bullet {
+  color: var(--wm-color-success);
+  font-weight: 700;
+  width: 14px;
+  text-align: center;
+}
+
+.wm-wiki-list-input {
+  flex: 1;
+  padding: 4px 8px;
+  font-size: 12px;
+  border: 1px solid var(--wm-color-border);
+  border-radius: var(--wm-radius-button);
+  color: var(--wm-color-text-primary);
+  background: var(--wm-color-surface);
+  outline: none;
+}
+
+.wm-wiki-list-input:focus {
+  border-color: var(--wm-color-success);
+}
+
+.wm-wiki-list-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--wm-color-text-muted);
+  cursor: pointer;
+  transition: color 0.12s;
+}
+
+.wm-wiki-list-remove:hover {
+  color: var(--wm-color-danger);
+}
+
+.wm-wiki-body-editor-wrap {
+  position: relative;
+}
+
+.wm-wiki-body-textarea {
+  width: 100%;
+  min-height: 200px;
+  padding: var(--wm-spacing-sm);
+  font-size: 13px;
+  line-height: 1.7;
+  border: 1px solid var(--wm-color-border);
+  border-radius: var(--wm-radius-button);
+  resize: vertical;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  color: var(--wm-color-text-primary);
+  background: var(--wm-color-surface);
+  outline: none;
+  transition: border-color 0.12s;
+}
+
+.wm-wiki-body-textarea:focus {
+  border-color: var(--wm-color-success);
+}
+
+.wm-wiki-link-popup {
+  position: absolute;
+  z-index: 100;
+  background: var(--wm-color-surface);
+  border: 1px solid var(--wm-color-border);
+  border-radius: var(--wm-radius-card);
+  box-shadow: var(--wm-shadow-card);
+  max-height: 200px;
+  overflow-y: auto;
+  min-width: 200px;
+}
+
+.wm-wiki-link-item {
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--wm-color-text-primary);
+  cursor: pointer;
+}
+
+.wm-wiki-link-item:hover,
+.wm-wiki-link-item-active {
+  background: var(--wm-color-surface-alt);
+  color: var(--wm-color-success);
+}
+
+.wm-wiki-preview {
+  min-height: 300px;
+}
+
+.wm-wiki-links-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wm-spacing-sm);
+}
+
+.wm-wiki-link-group {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--wm-spacing-sm);
+}
+
+.wm-wiki-link-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  flex: 1;
+}
+
+.wm-wiki-link-tag {
+  cursor: pointer;
+  transition: opacity 0.12s;
+}
+
+.wm-wiki-link-tag:hover {
+  opacity: 0.85;
+}
+
+.wm-wiki-sources {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wm-wiki-source-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.wm-wiki-source-tag {
+  font-family: 'SFMono-Regular', Consolas, monospace;
+}
+
+/* Review 卡片样式（从 inline <style> 迁移） */
+.wm-wiki-review-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wm-wiki-review-card-q {
+  font-size: 11px;
+  color: var(--wm-color-text-muted);
+  margin: 0;
+}
+
+.wm-wiki-review-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--wm-color-success);
+}
+
+.wm-wiki-review-card-meta {
+  font-size: 10px;
+  color: var(--wm-color-text-muted);
+}
+
+.wm-wiki-review-card-summary {
+  font-size: 11px;
+  color: var(--wm-color-text-secondary);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.wm-wiki-review-card-conf-low {
+  color: var(--wm-color-warning);
+  font-weight: 600;
+}
+
+.wm-wiki-review-card-conf-tag {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 4px;
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--wm-color-warning);
+  border: 1px solid var(--wm-color-warning);
+  border-radius: 3px;
+  line-height: 1.4;
+}
+
+.wm-wiki-review-card-why {
+  margin-top: 4px;
+  padding: 6px 8px;
+  background: var(--wm-color-surface-alt);
+  border-radius: var(--wm-radius-button);
+  border-left: 2px solid var(--wm-color-accent);
+}
+
+.wm-wiki-review-card-why-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--wm-color-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.wm-wiki-review-card-why-list {
+  margin: 4px 0 0 0;
+  padding-left: 16px;
+  font-size: 11px;
+  color: var(--wm-color-text-secondary);
+  line-height: 1.5;
+}
+
+.wm-wiki-review-card-why-list li {
+  list-style: disc;
+}
+
+.wm-wiki-review-card-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+/* 预览 Dialog 内容样式 */
+.wm-wiki-preview-dialog {
+  width: 720px;
+  max-width: 90vw;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.wm-wiki-modal-body {
+  padding: var(--wm-spacing-md);
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* 删除确认 Dialog 内容样式 */
+.wm-wiki-confirm-dialog {
+  max-width: 420px;
+}

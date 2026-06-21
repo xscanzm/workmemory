@@ -1,0 +1,549 @@
+/* Settings 页面样式（从 inline <style> 迁移，全局类名） */
+
+.wm-settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wm-spacing-md);
+  max-width: 880px;
+  margin: 0 auto;
+  padding-bottom: var(--wm-spacing-xl);
+}
+
+.wm-settings-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--wm-spacing-md);
+}
+
+.wm-settings-titles {
+  display: flex;
+  align-items: baseline;
+  gap: var(--wm-spacing-sm);
+}
+
+.wm-settings-title {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--wm-color-text-secondary);
+  letter-spacing: 0.5px;
+}
+
+.wm-settings-subtitle {
+  font-size: 13px;
+  color: var(--wm-color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.wm-settings-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--wm-spacing-sm);
+}
+
+/* 加载态 */
+.wm-settings-loading {
+  display: flex;
+  align-items: center;
+  gap: var(--wm-spacing-sm);
+  padding: var(--wm-spacing-lg);
+  color: var(--wm-color-text-muted);
+  font-size: 13px;
+}
+
+.wm-settings-loading-spinner {
+  animation: wm-settings-spin 0.8s linear infinite;
+}
+
+@keyframes wm-settings-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 设置卡片容器（包裹 Card 组件） */
+.wm-settings-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wm-spacing-md);
+}
+
+.wm-settings-card-header {
+  display: flex;
+  align-items: center;
+  gap: var(--wm-spacing-sm);
+}
+
+.wm-settings-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--wm-radius-button);
+  flex-shrink: 0;
+}
+
+.wm-settings-card-titles {
+  display: flex;
+  align-items: baseline;
+  gap: var(--wm-spacing-sm);
+}
+
+.wm-settings-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--wm-color-text-primary);
+  margin: 0;
+}
+
+.wm-settings-card-subtitle {
+  font-size: 11px;
+  color: var(--wm-color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.wm-settings-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wm-spacing-sm);
+}
+
+/* 设置行 */
+.wm-settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--wm-spacing-md);
+  padding: var(--wm-spacing-sm) 0;
+  border-top: 1px solid var(--wm-color-border);
+}
+
+.wm-settings-row:first-child {
+  border-top: none;
+}
+
+.wm-settings-row-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.wm-settings-row-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--wm-color-text-primary);
+}
+
+.wm-settings-row-desc {
+  font-size: 11px;
+  color: var(--wm-color-text-muted);
+  line-height: 1.5;
+}
+
+.wm-settings-row-control {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--wm-spacing-sm);
+}
+
+/* 文本/数字/日期输入框（原生 input，未替换为 TextField） */
+.wm-settings-text-input,
+.wm-settings-number-input,
+.wm-settings-date-input {
+  padding: 6px 10px;
+  font-size: 12px;
+  border-radius: var(--wm-radius-button);
+  border: 1px solid var(--wm-color-border);
+  background: var(--wm-color-surface);
+  color: var(--wm-color-text-primary);
+  outline: none;
+  transition: border-color 0.12s;
+  min-width: 200px;
+}
+
+.wm-settings-text-input:focus,
+.wm-settings-number-input:focus,
+.wm-settings-date-input:focus {
+  border-color: var(--wm-color-accent);
+}
+
+.wm-settings-number-input {
+  min-width: 80px;
+  width: 80px;
+}
+
+/* OCR 模型单选卡片 */
+.wm-settings-radio-group {
+  display: flex;
+  gap: var(--wm-spacing-sm);
+}
+
+.wm-settings-radio-card {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--wm-spacing-sm);
+  padding: var(--wm-spacing-sm) var(--wm-spacing-md);
+  border: 1px solid var(--wm-color-border);
+  border-radius: var(--wm-radius-button);
+  cursor: pointer;
+  transition: all 0.12s;
+  min-width: 160px;
+}
+
+.wm-settings-radio-card input {
+  margin-top: 3px;
+  cursor: pointer;
+}
+
+.wm-settings-radio-card-active {
+  border-color: var(--wm-color-cyan);
+  background: var(--wm-color-cyan-soft);
+}
+
+.wm-settings-radio-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wm-settings-radio-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--wm-color-text-primary);
+}
+
+.wm-settings-radio-desc {
+  font-size: 11px;
+  color: var(--wm-color-text-muted);
+}
+
+/* OCR 区 */
+.wm-settings-ocr-model-path {
+  font-size: 11px;
+  color: var(--wm-color-text-muted);
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.wm-settings-ocr-test-area {
+  display: flex;
+  align-items: center;
+  gap: var(--wm-spacing-sm);
+  flex-wrap: wrap;
+}
+
+.wm-settings-ocr-test-result {
+  padding: var(--wm-spacing-sm) var(--wm-spacing-md);
+  border-radius: var(--wm-radius-button);
+  font-size: 12px;
+  line-height: 1.6;
+  margin-top: var(--wm-spacing-xs);
+}
+
+.wm-settings-ocr-test-ok {
+  background: rgba(34, 181, 106, 0.08);
+  color: var(--wm-color-text-secondary);
+}
+
+.wm-settings-ocr-test-fail {
+  background: rgba(229, 72, 77, 0.08);
+  color: var(--wm-color-danger);
+}
+
+.wm-settings-ocr-test-meta {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.wm-settings-ocr-test-text {
+  margin: 0;
+  padding: var(--wm-spacing-sm);
+  background: var(--wm-color-surface-alt);
+  border-radius: var(--wm-radius-button);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 160px;
+  overflow-y: auto;
+  color: var(--wm-color-text-primary);
+}
+
+.wm-settings-ocr-hint {
+  padding: var(--wm-spacing-sm) var(--wm-spacing-md);
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--wm-color-warning);
+  background: rgba(245, 158, 11, 0.08);
+  border-radius: var(--wm-radius-button);
+  margin-top: var(--wm-spacing-xs);
+}
+
+/* AI 连接测试区 */
+.wm-settings-test-area {
+  display: flex;
+  align-items: center;
+  gap: var(--wm-spacing-sm);
+  flex-wrap: wrap;
+}
+
+.wm-settings-test-result {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: var(--wm-radius-pill);
+}
+
+.wm-settings-test-ok {
+  background: rgba(34, 181, 106, 0.12);
+  color: var(--wm-color-success);
+}
+
+.wm-settings-test-fail {
+  background: rgba(229, 72, 77, 0.12);
+  color: var(--wm-color-danger);
+}
+
+/* API Key 区 */
+.wm-settings-apikey-area {
+  display: flex;
+  align-items: center;
+  gap: var(--wm-spacing-sm);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* 隐私规则区 */
+.wm-settings-privacy-add {
+  display: flex;
+  gap: var(--wm-spacing-sm);
+  flex-wrap: wrap;
+  margin-bottom: var(--wm-spacing-sm);
+}
+
+.wm-settings-privacy-select {
+  min-width: 140px;
+}
+
+.wm-settings-privacy-pattern {
+  flex: 1;
+  min-width: 200px;
+}
+
+.wm-settings-privacy-empty {
+  padding: var(--wm-spacing-md);
+  font-size: 12px;
+  color: var(--wm-color-text-muted);
+  background: var(--wm-color-surface-alt);
+  border-radius: var(--wm-radius-button);
+  line-height: 1.6;
+}
+
+.wm-settings-privacy-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wm-settings-privacy-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--wm-spacing-sm);
+  padding: var(--wm-spacing-sm) var(--wm-spacing-md);
+  border-radius: var(--wm-radius-button);
+  background: var(--wm-color-surface);
+  border: 1px solid var(--wm-color-border);
+}
+
+.wm-settings-privacy-item-disabled {
+  opacity: 0.55;
+}
+
+.wm-settings-privacy-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.wm-settings-privacy-item-row {
+  display: flex;
+  align-items: center;
+  gap: var(--wm-spacing-sm);
+  flex-wrap: wrap;
+}
+
+.wm-settings-privacy-item-pattern {
+  font-size: 12px;
+  color: var(--wm-color-text-primary);
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 280px;
+}
+
+.wm-settings-privacy-item-mode {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: var(--wm-radius-button);
+  background: var(--wm-color-surface-alt);
+  color: var(--wm-color-text-muted);
+}
+
+.wm-settings-privacy-item-action {
+  font-size: 10px;
+  color: var(--wm-color-text-muted);
+}
+
+.wm-settings-privacy-item-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--wm-spacing-sm);
+}
+
+/* 桌面伙伴形象网格 */
+.wm-settings-mascot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: var(--wm-spacing-sm);
+}
+
+.wm-settings-mascot-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: var(--wm-spacing-md) var(--wm-spacing-sm);
+  border: 1px solid var(--wm-color-border);
+  border-radius: var(--wm-radius-card);
+  background: var(--wm-color-surface);
+  transition: all 0.12s;
+}
+
+.wm-settings-mascot-card:hover {
+  border-color: var(--wm-color-success);
+  background: var(--wm-color-surface-alt);
+}
+
+.wm-settings-mascot-card-active {
+  border-color: var(--wm-color-success);
+  background: rgba(34, 181, 106, 0.08);
+  box-shadow: 0 0 0 1px var(--wm-color-success);
+}
+
+.wm-settings-mascot-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--wm-color-text-secondary);
+}
+
+.wm-settings-mascot-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--wm-color-text-primary);
+}
+
+.wm-settings-mascot-desc {
+  font-size: 10px;
+  color: var(--wm-color-text-muted);
+  text-align: center;
+}
+
+/* 数据管理区 */
+.wm-settings-data-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: var(--wm-spacing-sm);
+  margin-bottom: var(--wm-spacing-md);
+}
+
+.wm-settings-data-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--wm-spacing-sm) var(--wm-spacing-md);
+  background: var(--wm-color-surface-alt);
+  border-radius: var(--wm-radius-button);
+}
+
+.wm-settings-data-stat-label {
+  font-size: 11px;
+  color: var(--wm-color-text-muted);
+}
+
+.wm-settings-data-stat-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--wm-color-text-primary);
+}
+
+.wm-settings-data-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wm-spacing-sm);
+}
+
+.wm-settings-data-action-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--wm-spacing-md);
+  padding: var(--wm-spacing-sm) var(--wm-spacing-md);
+  border-radius: var(--wm-radius-button);
+  background: var(--wm-color-surface);
+  border: 1px solid var(--wm-color-border);
+}
+
+.wm-settings-data-action-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.wm-settings-data-action-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--wm-color-text-primary);
+}
+
+.wm-settings-data-action-desc {
+  font-size: 11px;
+  color: var(--wm-color-text-muted);
+  line-height: 1.5;
+}
+
+.wm-settings-data-action-form {
+  display: flex;
+  gap: var(--wm-spacing-sm);
+  align-items: center;
+}
+
+/* 危险操作确认 Dialog */
+.wm-settings-confirm-dialog {
+  max-width: 420px;
+}
+
+.wm-settings-confirm-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--wm-spacing-sm);
+}

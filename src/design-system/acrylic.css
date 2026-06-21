@@ -1,0 +1,38 @@
+/* Fluent 亚克力材质样式：用于侧边栏、详情面板、Mascot 背景 */
+
+.wm-acrylic {
+  background-color: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+}
+
+.wm-acrylic-sidebar {
+  background-color: rgba(238, 242, 247, 0.72);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border-right: 1px solid var(--wm-color-border);
+}
+
+.wm-acrylic-panel {
+  background-color: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(16px) saturate(130%);
+  -webkit-backdrop-filter: blur(16px) saturate(130%);
+  border-left: 1px solid var(--wm-color-border);
+}
+
+.wm-acrylic-card {
+  background-color: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(12px) saturate(120%);
+  -webkit-backdrop-filter: blur(12px) saturate(120%);
+  border: 1px solid var(--wm-color-border);
+  border-radius: var(--wm-radius-card);
+  box-shadow: var(--wm-shadow-card);
+}
+
+.wm-acrylic-mascot {
+  background-color: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(12px) saturate(120%);
+  -webkit-backdrop-filter: blur(12px) saturate(120%);
+  border-radius: var(--wm-radius-card);
+  box-shadow: var(--wm-shadow-card);
+}

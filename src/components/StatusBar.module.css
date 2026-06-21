@@ -1,0 +1,42 @@
+/* 记录状态条样式 */
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--wm-spacing-sm) var(--wm-spacing-lg);
+  border-radius: var(--wm-radius-card);
+  border: 1px solid var(--wm-color-border);
+}
+
+.indicator {
+  display: flex;
+  align-items: center;
+  gap: var(--wm-spacing-sm);
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.pulse {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid;
+  opacity: 0;
+  animation: wm-pulse 2s ease-out infinite;
+}
+
+@keyframes wm-pulse {
+  0% { opacity: 0.6; transform: scale(0.8); }
+  100% { opacity: 0; transform: scale(1.8); }
+}
+
+.actions {
+  display: flex;
+  gap: var(--wm-spacing-sm);
+}

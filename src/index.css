@@ -1,0 +1,87 @@
+@import './design-system/acrylic.css';
+@import './design-system/scrollbar.css';
+
+:root {
+  /* 间距 token */
+  --wm-spacing-xs: 4px;
+  --wm-spacing-sm: 8px;
+  --wm-spacing-md: 12px;
+  --wm-spacing-lg: 16px;
+  --wm-spacing-xl: 24px;
+  --wm-spacing-xxl: 32px;
+
+  /* 圆角 token */
+  --wm-radius-card: 8px;
+  --wm-radius-button: 6px;
+  --wm-radius-pill: 999px;
+  --wm-radius-none: 0px;
+
+  /* 阴影 token */
+  --wm-shadow-card: 0px 4px 16px rgba(0, 0, 0, 0.1);
+  --wm-shadow-window: 0px 8px 32px rgba(0, 0, 0, 0.16);
+  --wm-shadow-none: none;
+
+  /* 亮色主题色板 (calm light theme) */
+  --wm-color-background: #f5f7fa;
+  --wm-color-surface: #ffffff;
+  --wm-color-surface-alt: #eef2f7;
+  --wm-color-sidebar: rgba(238, 242, 247, 0.72);
+  --wm-color-text-primary: #1a2332;
+  --wm-color-text-secondary: #5a6a7e;
+  --wm-color-text-muted: #8a98aa;
+  --wm-color-accent: #2b7fff;
+  --wm-color-accent-hover: #1a6fef;
+  --wm-color-accent-soft: rgba(43, 127, 255, 0.1);
+  --wm-color-cyan: #22c5d8;
+  --wm-color-cyan-soft: rgba(34, 197, 216, 0.12);
+  --wm-color-border: #e1e7ef;
+  --wm-color-border-strong: #cdd6e2;
+  --wm-color-success: #22b56a;
+  --wm-color-warning: #f5a623;
+  --wm-color-danger: #e5484d;
+  --wm-color-privacy: #8b5cf6;
+
+  --wm-z-sidebar: 10;
+  --wm-z-titlebar: 100;
+  --wm-z-modal: 1000;
+  --wm-z-mascot: 2000;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei',
+    sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  background: var(--wm-color-background);
+  color: var(--wm-color-text-primary);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+input,
+textarea {
+  font-family: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}

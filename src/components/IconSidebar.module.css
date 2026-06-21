@@ -1,0 +1,39 @@
+/* 左侧 Icon Sidebar 样式 */
+.sidebar {
+  width: 76px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--wm-spacing-md) 0;
+  gap: var(--wm-spacing-xs);
+  overflow-y: auto;
+  z-index: var(--wm-z-sidebar);
+}
+
+.navItem {
+  position: relative;
+  color: var(--wm-color-text-muted);
+}
+
+.navItem:hover {
+  background-color: var(--wm-color-accent-soft);
+  color: var(--nav-accent, var(--wm-color-accent));
+}
+
+.navItemActive {
+  color: var(--nav-accent, var(--wm-color-accent));
+  background-color: var(--wm-color-accent-soft);
+}
+
+.navItemActive::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 22px;
+  border-radius: var(--wm-radius-pill);
+  background: var(--nav-accent, var(--wm-color-accent));
+}

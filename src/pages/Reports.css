@@ -1,0 +1,631 @@
+/* Reports 页面样式 — 精品桌面产品视觉重构（全局类名）
+ * 对应 Reports.tsx，所有样式从内联 <style> 迁移至此，统一使用设计 token。
+ * 布局：顶部工具栏 + 左侧编辑区（工具栏/控件/编辑预览）+ 右侧历史列表 + AI 确认 Dialog。
+ */
+
+/* ============================ 根容器 ============================ */
+.wm-reports {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  gap: var(--wm-spacing-md);
+}
+
+/* ============================ 顶部工具栏 ============================ */
+.wm-reports-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--wm-spacing-md);
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.wm-reports-titles {
+  display: flex;
+  align-items: baseline;
+  gap: var(--wm-spacing-sm);
+}
+
+.wm-reports-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--wm-color-text-primary);
+  letter-spacing: 0.3px;
+  line-height: 1.2;
+}
+
+.wm-reports-subtitle {
+  font-size: 12px;
+  color: var(--wm-color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.wm-reports-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--wm-spacing-sm);
+  flex-wrap: wrap;
+}
+
+.wm-reports-field {
+  display: flex;
+  align-items: center;
+  gap: var(--wm-spacing-xs);
+}
+
+.wm-reports-field-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--wm-color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.wm-reports-template-select {
+  min-width: 140px;
+}
+
+/* ============================ 主体两栏 ============================ */
+.wm-reports-body {
+  display: flex;
+  gap: var(--wm-spacing-md);
+  flex: 1;
+  min-height: 0;
+}
+
+/* ============================ 左侧编辑区 ============================ */
+.wm-reports-editor-section {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--wm-spacing-sm);
+  min-height: 0;
+}
+
+/* 编辑器工具栏（Card acrylic padding=sm） */
+.wm-reports-editor-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--wm-spacing-sm);
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.wm-reports-editor-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--wm-spacing-sm);
+  min-width: 0;
+}
+
+.wm-reports-editor-meta-text {
+  font-size: 12px;
+  color: var(--wm-color-text-secondary);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wm-reports-editor-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--wm-spacing-xs);
+  flex-wrap: wrap;
+}
+
+/* 日期 + 编辑/预览切换控件行 */
+.wm-reports-editor-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--wm-spacing-md);
+  flex-shrink: 0;
+}
+
+.wm-reports-date-field {
+  min-width: 180px;
+}
+
+/* 编辑/预览面板（Card solid，覆盖默认内边距使 textarea 贴边） */
+.wm-reports-editor-pane.wm-ui-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+
+.wm-reports-editor-textarea {
+  flex: 1;
+  width: 100%;
+  padding: var(--wm-spacing-md);
+  font-size: 13px;
+  line-height: 1.7;
+  border: none;
+  resize: none;
+  outline: none;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  color: var(--wm-color-text-primary);
+  background: transparent;
+}
+
+.wm-reports-preview-pane {
+  flex: 1;
+  min-width: 0;
+  padding: var(--wm-spacing-md);
+  background: transparent;
+  overflow-y: auto;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--wm-color-text-primary);
+}
+
+.wm-reports-preview-pane :first-child {
+  margin-top: 0;
+}
+
+.wm-reports-preview-pane :last-child {
+  margin-bottom: 0;
+}
+
+.wm-reports-preview-empty {
+  color: var(--wm-color-text-muted);
+  font-size: 12px;
+  font-style: italic;
+  padding: var(--wm-spacing-lg);
+  text-align: center;
+}
+
+/* ============================ 右侧历史列表 ============================ */
+.wm-reports-history {
+  width: 280px;
+  flex-shrink: 0;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--wm-spacing-sm);
+}
+
+.wm-reports-history-header {
+  display: flex;
+  align-items: center;
+  gap: var(--wm-spacing-xs);
+  padding-bottom: var(--wm-spacing-sm);
+  border-bottom: 1px solid var(--wm-color-border);
+  flex-shrink: 0;
+}
+
+.wm-reports-history-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--wm-color-text-secondary);
+  flex: 1;
+}
+
+.wm-reports-history-loading {
+  display: flex;
+  align-items: center;
+  gap: var(--wm-spacing-sm);
+  padding: var(--wm-spacing-lg);
+  font-size: 12px;
+  color: var(--wm-color-text-muted);
+}
+
+.wm-reports-loading-spinner {
+  animation: wm-reports-spin 0.8s linear infinite;
+  color: var(--wm-color-accent);
+}
+
+@keyframes wm-reports-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.wm-reports-history-empty {
+  padding: var(--wm-spacing-lg);
+  text-align: center;
+  font-size: 12px;
+  color: var(--wm-color-text-muted);
+  line-height: 1.6;
+}
+
+.wm-reports-history-empty p {
+  margin: 0;
+}
+
+.wm-reports-history-empty-hint {
+  font-size: 11px;
+  margin-top: var(--wm-spacing-xs);
+  opacity: 0.7;
+}
+
+.wm-reports-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wm-spacing-xs);
+}
+
+/* 历史卡片（Card solid，可点击 + selected 态） */
+.wm-reports-history-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wm-spacing-xs);
+}
+
+.wm-reports-history-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--wm-spacing-xs);
+}
+
+.wm-reports-history-card-date {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--wm-color-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.wm-reports-history-card-badges {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.wm-reports-history-card-preview {
+  font-size: 11px;
+  color: var(--wm-color-text-muted);
+  line-height: 1.5;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+/* ============================ AI 确认 Dialog ============================ */
+.wm-reports-dialog {
+  max-width: 600px;
+  width: 100%;
+}
+
+.wm-reports-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wm-spacing-md);
+  padding: var(--wm-spacing-md) var(--wm-spacing-lg);
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+/* 安全提示条 */
+.wm-reports-dialog-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--wm-spacing-sm);
+  padding: var(--wm-spacing-sm) var(--wm-spacing-md);
+  background: var(--wm-color-accent-soft);
+  border: 1px solid var(--wm-color-accent);
+  border-radius: var(--wm-radius-button);
+  font-size: 12px;
+  color: var(--wm-color-text-secondary);
+  line-height: 1.6;
+}
+
+.wm-reports-dialog-notice svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--wm-color-accent);
+}
+
+.wm-reports-dialog-notice strong {
+  color: var(--wm-color-accent);
+  font-weight: 600;
+}
+
+/* 元信息网格（日期 / 模板） */
+.wm-reports-dialog-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--wm-spacing-sm) var(--wm-spacing-md);
+  padding: var(--wm-spacing-sm) var(--wm-spacing-md);
+  background: var(--wm-color-surface-alt);
+  border-radius: var(--wm-radius-button);
+}
+
+.wm-reports-dialog-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.wm-reports-dialog-meta-label {
+  font-size: 10px;
+  color: var(--wm-color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.wm-reports-dialog-meta-value {
+  font-size: 13px;
+  color: var(--wm-color-text-primary);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wm-reports-dialog-template-select {
+  width: 100%;
+}
+
+/* Dialog 分区块 */
+.wm-reports-dialog-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wm-spacing-sm);
+}
+
+.wm-reports-dialog-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--wm-spacing-sm);
+}
+
+.wm-reports-dialog-section-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--wm-spacing-sm);
+}
+
+.wm-reports-dialog-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--wm-color-text-secondary);
+}
+
+.wm-reports-dialog-checkall {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--wm-color-text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.wm-reports-dialog-checkall input[type="checkbox"] {
+  cursor: pointer;
+}
+
+/* Episode 勾选列表 */
+.wm-reports-dialog-episode-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: var(--wm-spacing-sm);
+  border: 1px solid var(--wm-color-border);
+  border-radius: var(--wm-radius-button);
+  background: var(--wm-color-surface);
+}
+
+.wm-reports-dialog-episode-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--wm-spacing-sm);
+  padding: var(--wm-spacing-xs) var(--wm-spacing-sm);
+  border-radius: var(--wm-radius-button);
+  transition: background 0.12s;
+}
+
+.wm-reports-dialog-episode-item:hover {
+  background: var(--wm-color-surface-alt);
+}
+
+.wm-reports-dialog-episode-item-checked {
+  background: var(--wm-color-accent-soft);
+}
+
+.wm-reports-dialog-episode-item-checked:hover {
+  background: var(--wm-color-accent-soft);
+}
+
+.wm-reports-dialog-episode-item-expanded {
+  flex-wrap: wrap;
+}
+
+.wm-reports-dialog-episode-item input[type="checkbox"] {
+  margin-top: 3px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.wm-reports-dialog-episode-chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--wm-color-text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  border-radius: 3px;
+  transition: color 0.12s, background 0.12s;
+}
+
+.wm-reports-dialog-episode-chevron:hover {
+  color: var(--wm-color-accent);
+  background: var(--wm-color-surface);
+}
+
+.wm-reports-dialog-episode-trash {
+  margin-top: 1px;
+  flex-shrink: 0;
+  color: var(--wm-color-text-muted);
+}
+
+.wm-reports-dialog-episode-trash:hover {
+  color: var(--wm-color-danger);
+}
+
+.wm-reports-dialog-episode-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wm-reports-dialog-episode-row {
+  display: flex;
+  align-items: center;
+  gap: var(--wm-spacing-sm);
+  min-width: 0;
+}
+
+.wm-reports-dialog-episode-time {
+  font-size: 11px;
+  color: var(--wm-color-text-muted);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.wm-reports-dialog-episode-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--wm-color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.wm-reports-dialog-episode-summary {
+  font-size: 11px;
+  color: var(--wm-color-text-secondary);
+  line-height: 1.4;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wm-reports-dialog-episode-empty {
+  padding: var(--wm-spacing-md);
+  text-align: center;
+  font-size: 11px;
+  color: var(--wm-color-text-muted);
+}
+
+/* C3.1：可展开预览区（滚动，max-height 200px） */
+.wm-reports-dialog-episode-preview {
+  margin-top: var(--wm-spacing-xs);
+  padding: var(--wm-spacing-xs) var(--wm-spacing-sm);
+  max-height: 200px;
+  overflow-y: auto;
+  background: var(--wm-color-surface);
+  border: 1px solid var(--wm-color-border);
+  border-radius: var(--wm-radius-button);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wm-reports-dialog-episode-preview-row {
+  display: flex;
+  gap: var(--wm-spacing-sm);
+  font-size: 11px;
+  line-height: 1.5;
+  align-items: flex-start;
+}
+
+.wm-reports-dialog-episode-preview-label {
+  flex-shrink: 0;
+  width: 32px;
+  color: var(--wm-color-text-muted);
+  font-weight: 600;
+}
+
+.wm-reports-dialog-episode-preview-value {
+  flex: 1;
+  min-width: 0;
+  color: var(--wm-color-text-secondary);
+  word-break: break-word;
+}
+
+/* 用户备注 */
+.wm-reports-dialog-notes {
+  width: 100%;
+  padding: var(--wm-spacing-sm);
+  font-size: 12px;
+  line-height: 1.6;
+  border: 1px solid var(--wm-color-border);
+  border-radius: var(--wm-radius-button);
+  resize: vertical;
+  min-height: 60px;
+  font-family: inherit;
+  color: var(--wm-color-text-primary);
+  background: var(--wm-color-surface);
+  outline: none;
+  transition: border-color 0.12s;
+}
+
+.wm-reports-dialog-notes:focus {
+  border-color: var(--wm-color-accent);
+}
+
+.wm-reports-dialog-notes::placeholder {
+  color: var(--wm-color-text-muted);
+}
+
+/* 错误提示 */
+.wm-reports-dialog-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: var(--wm-spacing-sm) var(--wm-spacing-md);
+  background: rgba(229, 72, 77, 0.08);
+  border: 1px solid rgba(229, 72, 77, 0.3);
+  border-radius: var(--wm-radius-button);
+  font-size: 12px;
+  color: var(--wm-color-danger);
+  line-height: 1.5;
+}
+
+.wm-reports-dialog-error svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* ============================ 响应式 ============================ */
+@media (max-width: 880px) {
+  .wm-reports-body {
+    flex-direction: column;
+  }
+  .wm-reports-history {
+    width: 100%;
+    max-height: 240px;
+  }
+  .wm-reports-dialog-meta {
+    grid-template-columns: 1fr;
+  }
+}

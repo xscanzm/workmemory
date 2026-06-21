@@ -1,0 +1,39 @@
+/* 空状态占位组件样式 */
+.state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--wm-spacing-xxl) var(--wm-spacing-xl);
+  text-align: center;
+  gap: var(--wm-spacing-md);
+}
+
+.icon {
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--wm-color-text-muted);
+  opacity: 0.45;
+}
+
+.title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--wm-color-text-secondary);
+  margin: 0;
+}
+
+.desc {
+  font-size: 13px;
+  color: var(--wm-color-text-muted);
+  line-height: 1.6;
+  max-width: 340px;
+  margin: 0;
+}
+
+.action {
+  margin-top: var(--wm-spacing-sm);
+}

@@ -1,0 +1,286 @@
+/*
+ * Mascot 页面样式（统一视觉语言版）
+ *
+ * 色板对齐设计系统：状态强调色随状态变化，主体白底 + 边框 + 文字细节。
+ * 状态色映射（与 Mascot.tsx getStatePalette 一致）：
+ *  - recording     #2b7fff（强调蓝）
+ *  - paused        #f5a623（警示橙）
+ *  - privacy       #8b5cf6（隐私紫）
+ *  - ocr_scanning  #22c5d8（扫描青）
+ *  - report_ready  #22b56a（成功绿）
+ */
+
+.wm-mascot-root {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  cursor: pointer;
+  user-select: none;
+  -webkit-app-region: no-drag;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.wm-mascot-ready {
+  opacity: 1;
+}
+.wm-mascot-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  transition: transform 0.15s ease;
+}
+.wm-mascot-root:hover .wm-mascot-stage {
+  transform: scale(1.06);
+}
+.wm-mascot-svg {
+  display: block;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.18));
+}
+
+/* 状态指示器 */
+.wm-mascot-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--wm-radius-card);
+  font-size: 9px;
+  font-weight: 600;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  white-space: nowrap;
+}
+.wm-mascot-indicator-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.wm-mascot-indicator-recording .wm-mascot-indicator-dot {
+  background: #2b7fff;
+  animation: wm-mascot-pulse 1.4s ease-in-out infinite;
+}
+.wm-mascot-indicator-recording {
+  color: #1e40af;
+}
+.wm-mascot-indicator-paused .wm-mascot-indicator-dot {
+  background: #f5a623;
+}
+.wm-mascot-indicator-paused {
+  color: #854d0e;
+}
+.wm-mascot-indicator-privacy .wm-mascot-indicator-dot {
+  background: #8b5cf6;
+}
+.wm-mascot-indicator-privacy {
+  color: #5b21b6;
+}
+.wm-mascot-indicator-ocr_scanning .wm-mascot-indicator-dot {
+  background: #22c5d8;
+  animation: wm-mascot-pulse 1s ease-in-out infinite;
+}
+.wm-mascot-indicator-ocr_scanning {
+  color: #155e75;
+}
+.wm-mascot-indicator-report_ready .wm-mascot-indicator-dot {
+  background: #22b56a;
+  animation: wm-mascot-bounce 1.6s ease-in-out infinite;
+}
+.wm-mascot-indicator-report_ready {
+  color: #15803d;
+}
+
+/* 气泡：8px 圆角 + 亚克力材质 */
+.wm-mascot-bubble {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 200px;
+  max-width: 280px;
+  padding: 10px 12px;
+  border-radius: var(--wm-radius-card);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.08);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  animation: wm-mascot-bubble-in 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 10;
+}
+.wm-mascot-bubble::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: rgba(255, 255, 255, 0.72);
+}
+.wm-mascot-bubble-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 50%;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.12s;
+}
+.wm-mascot-bubble-close:hover {
+  background: rgba(0, 0, 0, 0.12);
+  color: #1f2937;
+}
+.wm-mascot-bubble-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--wm-color-text-primary);
+  margin-bottom: 4px;
+  padding-right: 16px;
+}
+.wm-mascot-bubble-message {
+  font-size: 11px;
+  color: #4b5563;
+  line-height: 1.5;
+}
+.wm-mascot-bubble-action {
+  margin-top: 8px;
+  padding: 4px 10px;
+  border: none;
+  border-radius: var(--wm-radius-button);
+  background: var(--wm-color-accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.12s;
+}
+.wm-mascot-bubble-action:hover {
+  background: var(--wm-color-accent-hover);
+}
+
+/* 动画关键帧 */
+@keyframes wm-mascot-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.85);
+  }
+}
+@keyframes wm-mascot-bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+@keyframes wm-mascot-bubble-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+@keyframes wm-mascot-scanline-move {
+  0% {
+    transform: translateY(0);
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateY(32px);
+    opacity: 0.3;
+  }
+}
+@keyframes wm-mascot-ripple-expand {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.4;
+  }
+  100% {
+    transform: scale(1.3);
+    opacity: 0;
+  }
+}
+@keyframes wm-mascot-magnifier-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+@keyframes wm-mascot-sparkle-twinkle {
+  0% {
+    opacity: 0.4;
+    transform: scale(0.8);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+@keyframes wm-mascot-fade-breathe {
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* 状态强调徽标动画（按状态触发） */
+.wm-mascot-state-recording .wm-mascot-pulse-dot {
+  animation: wm-mascot-pulse 1.4s ease-in-out infinite;
+  transform-origin: 104px 28px;
+}
+.wm-mascot-state-recording .wm-mascot-ripple {
+  animation: wm-mascot-ripple-expand 2s ease-out infinite;
+  transform-origin: 57px 48px;
+}
+.wm-mascot-state-paused .wm-mascot-pause-mark {
+  animation: wm-mascot-fade-breathe 2s ease-in-out infinite;
+}
+.wm-mascot-state-ocr_scanning .wm-mascot-scanline {
+  animation: wm-mascot-scanline-move 1.4s ease-in-out infinite alternate;
+}
+.wm-mascot-state-ocr_scanning .wm-mascot-magnifier {
+  animation: wm-mascot-magnifier-bob 1.6s ease-in-out infinite;
+  transform-origin: 102px 92px;
+}
+.wm-mascot-state-report_ready .wm-mascot-sparkle {
+  animation: wm-mascot-sparkle-twinkle 1.2s ease-in-out infinite alternate;
+  transform-origin: center;
+}
