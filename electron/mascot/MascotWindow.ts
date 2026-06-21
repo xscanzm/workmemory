@@ -19,8 +19,8 @@ import type { MascotStyle, MascotState } from '@/types'
 import { MascotChannels } from '../types/ipc'
 
 /** Mascot 窗口尺寸 */
-const MASCOT_WIDTH = 120
-const MASCOT_HEIGHT = 120
+const MASCOT_WIDTH = 340
+const MASCOT_HEIGHT = 146
 
 /** 边缘吸附阈值（像素） */
 const EDGE_SNAP_THRESHOLD = 50
@@ -96,6 +96,7 @@ export class MascotWindow {
       y,
       frame: false,
       transparent: true,
+      backgroundColor: '#00000000',
       alwaysOnTop: true,
       skipTaskbar: true,
       resizable: false,

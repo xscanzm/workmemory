@@ -97,6 +97,8 @@ const COMMON_TLDS = new Set(['com', 'org', 'net', 'cn', 'io', 'dev', 'edu', 'gov
 
 /** 中文姓名正则（仅中文） */
 const CHINESE_ONLY_REGEX = /^[\u4e00-\u9fff]+$/
+const PERSON_SOURCE_PROCESS_REGEX = /(weixin|wechat|wxwork|dingtalk|feishu|lark|qq|slack|teams|telegram|discord)/i
+const PERSON_SOURCE_TITLE_REGEX = /(微信|企业微信|钉钉|飞书|QQ|聊天|群聊|私聊|消息|对话|Slack|Teams|Telegram|Discord|IM)/i
 
 /**
  * EntityExtractor：实体提取器。
@@ -110,15 +112,16 @@ export class EntityExtractor {
     const segments = this.getSegmentsForEpisode(episode)
     const aggregatedText = this.aggregateText(segments)
     const windowTitles = segments.map(s => s.windowTitle).join('\n')
+    const sourceHint = this.buildPersonSourceHint(segments)
 
-    return this.extractFromText(aggregatedText, windowTitles)
+    return this.extractFromText(aggregatedText, windowTitles, sourceHint)
   }
 
   /**
    * 从文本提取实体（OCR 文本 + 窗口标题）。
    * 返回去重后的 EntityRef[]。
    */
-  extractFromText(ocrText: string, windowTitles: string): EntityRef[] {
+  extractFromText(ocrText: string, windowTitles: string, personSourceHint = ''): EntityRef[] {
     const entities: EntityRef[] = []
     const seen = new Set<string>()
 
@@ -134,7 +137,7 @@ export class EntityExtractor {
     const fullText = `${ocrText}\n${windowTitles}`
 
     // 1. 提取人名
-    for (const person of this.extractPersons(ocrText)) {
+    for (const person of this.extractPersons(ocrText, personSourceHint)) {
       addEntity(person)
     }
 
@@ -192,8 +195,18 @@ export class EntityExtractor {
     return segments.map(s => s.ocrText).filter(t => t.length > 0).join('\n')
   }
 
+  private buildPersonSourceHint(segments: WorkSegment[]): string {
+    return segments
+      .map((segment) => `${segment.appName} ${segment.processName} ${segment.windowTitle} ${segment.browserUrl ?? ''}`.trim())
+      .join('\n')
+  }
+
   /** 提取人名（中文姓名 + 英文姓名） */
-  private extractPersons(text: string): EntityRef[] {
+  private extractPersons(text: string, sourceHint: string): EntityRef[] {
+    if (!this.hasPersonSourceContext(sourceHint, text)) {
+      return []
+    }
+
     const persons: EntityRef[] = []
     const seen = new Set<string>()
 
@@ -221,6 +234,11 @@ export class EntityExtractor {
     }
 
     return persons
+  }
+
+  private hasPersonSourceContext(sourceHint: string, text: string): boolean {
+    const haystack = `${sourceHint}\n${text}`
+    return PERSON_SOURCE_PROCESS_REGEX.test(haystack) || PERSON_SOURCE_TITLE_REGEX.test(haystack)
   }
 
   /**

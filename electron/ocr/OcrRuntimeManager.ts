@@ -25,6 +25,7 @@ import {
   type BackendType
 } from './PpOcrEngine'
 import { SettingsStore } from '../db/SettingsStore'
+import { getOcrManager } from './OcrManager'
 
 /** OCR runtime 状态（与 BackendStatus 一致） */
 export type OcrRuntimeStatus = BackendStatus
@@ -131,8 +132,10 @@ export class OcrRuntimeManager {
       return { ok: false, error: `图片文件不存在: ${imagePath}` }
     }
 
-    // 使用独立的 PpOcrEngine 实例进行测试，不干扰 OcrManager 的运行时状态
-    const engine = new PpOcrEngine()
+    // 复用主 OCR 管理器的共享引擎，避免每次测试都额外拉起一个 ppocr_cli server。
+    const manager = getOcrManager()
+    const engine = manager.getEngine()
+    const shouldReleaseAfterTest = !engine.isLoaded()
     try {
       await engine.initialize(model)
       if (!engine.isLoaded()) {
@@ -152,7 +155,9 @@ export class OcrRuntimeManager {
         error: e instanceof Error ? e.message : String(e)
       }
     } finally {
-      engine.release()
+      if (shouldReleaseAfterTest) {
+        engine.release()
+      }
     }
   }
 

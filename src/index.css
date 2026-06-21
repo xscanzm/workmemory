@@ -69,6 +69,12 @@ body,
   user-select: none;
 }
 
+html.wm-mascot-page,
+body.wm-mascot-page,
+#root.wm-mascot-page {
+  background: transparent !important;
+}
+
 button {
   font-family: inherit;
   cursor: pointer;

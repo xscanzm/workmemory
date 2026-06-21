@@ -46,7 +46,7 @@ export class OcrManager {
     this.queue = new OcrQueue(this.engine, {
       saveScreenshots: false,
       concurrency: 1,
-      idleReleaseMs: 5 * 60 * 1000
+      idleReleaseMs: 10 * 1000
     })
   }
 

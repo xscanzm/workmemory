@@ -53,6 +53,7 @@ const BROWSER_PROCESSES = new Set([
 
 /** 浏览器标题后缀正则："页面标题 - 浏览器名" 格式（支持 - – — 三种连字符） */
 const BROWSER_TITLE_SUFFIX_REGEX = /\s+[-–—]\s+(Google Chrome|Microsoft Edge|Mozilla Firefox|Firefox|Safari|Brave|Opera|Vivaldi|Chromium|Arc)\s*$/i
+const EDGE_PROFILE_SUFFIX_REGEX = /\s+[-–—]\s+[^–—-]+?\s+[-–—]\s+Microsoft\s*Edge\s*$/i
 
 /** 常见域名匹配正则（标题中直接出现的完整域名，含常见 TLD） */
 const DOMAIN_REGEX = /\b([a-z0-9-]+\.(?:com|org|net|cn|io|dev|edu|gov|info|biz|co|ai|app|cloud|me|tv|us|uk|de|fr|jp|kr|ru|br|in|au|ca))\b/i
@@ -74,9 +75,18 @@ function isBrowserProcess(processName: string): boolean {
  */
 function parsePageTitle(windowTitle: string): string | null {
   const match = windowTitle.match(BROWSER_TITLE_SUFFIX_REGEX)
-  if (!match || match.index === undefined) return null
-  const title = windowTitle.slice(0, match.index).trim()
-  return title.length > 0 ? title : null
+  if (match && match.index !== undefined) {
+    const title = windowTitle.slice(0, match.index).trim()
+    return title.length > 0 ? title : null
+  }
+
+  const edgeProfileMatch = windowTitle.match(EDGE_PROFILE_SUFFIX_REGEX)
+  if (edgeProfileMatch && edgeProfileMatch.index !== undefined) {
+    const title = windowTitle.slice(0, edgeProfileMatch.index).trim()
+    return title.length > 0 ? title : null
+  }
+
+  return null
 }
 
 /**

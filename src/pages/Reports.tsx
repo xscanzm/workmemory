@@ -201,6 +201,7 @@ export function Reports(): JSX.Element {
   const [selectedEpisodeIds, setSelectedEpisodeIds] = useState<Set<string>>(new Set())
   const [userNotes, setUserNotes] = useState<string>('')
   const [generating, setGenerating] = useState<boolean>(false)
+  const [generatingMessage, setGeneratingMessage] = useState<string>('')
   const [generateError, setGenerateError] = useState<string>('')
 
   // C3.1：可展开预览的 Episode id 集合
@@ -491,6 +492,7 @@ export function Reports(): JSX.Element {
       return
     }
     setGenerating(true)
+    setGeneratingMessage('正在整理片段并请求 AI 生成日报，这通常需要几十秒。')
     setGenerateError('')
     try {
       const payload: AiGenerateReportPayload = {
@@ -506,6 +508,7 @@ export function Reports(): JSX.Element {
       setDraft(result.report)
       setIsNew(false)
       setShowConfirmModal(false)
+      setGeneratingMessage('')
       const warningSuffix = result.warning ? '（含交叉校验警告）' : ''
       toast.success('日报生成成功', `已保存为草稿${warningSuffix}`)
       await loadData()
@@ -513,6 +516,7 @@ export function Reports(): JSX.Element {
       setGenerateError(e instanceof Error ? e.message : String(e))
     } finally {
       setGenerating(false)
+      setGeneratingMessage('')
     }
   }, [selectedEpisodeIds, selectedDate, templateId, userNotes, loadData, buildReportSnapshot])
 
@@ -772,7 +776,17 @@ export function Reports(): JSX.Element {
 
           {/* 编辑区/预览区 */}
           <Card variant="solid" className="wm-reports-editor-pane">
-            {editorMode === 'edit' ? (
+            {generating ? (
+              <div className="wm-reports-generating-state">
+                <Loader2 size={18} className="wm-reports-loading-spinner" />
+                <div className="wm-reports-generating-copy">
+                  <div className="wm-reports-generating-title">日报生成中</div>
+                  <div className="wm-reports-generating-text">
+                    {generatingMessage || 'AI 正在生成日报，请稍候...'}
+                  </div>
+                </div>
+              </div>
+            ) : editorMode === 'edit' ? (
               <textarea
                 className="wm-reports-editor-textarea"
                 value={draft.markdownContent}

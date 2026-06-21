@@ -115,6 +115,16 @@ export default function Mascot(): JSX.Element {
     })()
   }, [])
 
+  useEffect(() => {
+    const nodes = [document.documentElement, document.body, document.getElementById('root')]
+      .filter((node): node is HTMLElement => node instanceof HTMLElement)
+
+    nodes.forEach((node) => node.classList.add('wm-mascot-page'))
+    return () => {
+      nodes.forEach((node) => node.classList.remove('wm-mascot-page'))
+    }
+  }, [])
+
   // ===================== 监听主进程事件 =====================
 
   useEffect(() => {
@@ -206,18 +216,28 @@ export default function Mascot(): JSX.Element {
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      <div className="wm-mascot-stage">
-        <MascotFigure style={style} state={state} />
-        <StateIndicator state={state} />
+      <div className="wm-mascot-shell">
+        <div className="wm-mascot-stage">
+          <div className="wm-mascot-figure-wrap">
+            <div className="wm-mascot-figure-glow" />
+            <MascotFigure style={style} state={state} />
+          </div>
+          <div className="wm-mascot-meta">
+            <div className="wm-mascot-eyebrow">桌面伙伴</div>
+            <div className="wm-mascot-title">{getMascotTitle(style)}</div>
+            <div className="wm-mascot-caption">{getStateCopy(state)}</div>
+            <StateIndicator state={state} />
+          </div>
+        </div>
+        {bubble && (
+          <MascotBubble
+            title={bubble.title}
+            message={bubble.message}
+            action={bubble.action}
+            onClose={closeBubble}
+          />
+        )}
       </div>
-      {bubble && (
-        <MascotBubble
-          title={bubble.title}
-          message={bubble.message}
-          action={bubble.action}
-          onClose={closeBubble}
-        />
-      )}
     </div>
   )
 }
@@ -239,28 +259,57 @@ interface MascotPalette {
 }
 
 /** 基础色板（与状态无关，对齐设计系统） */
-const BASE_PALETTE: Omit<MascotPalette, 'accent'> = {
-  surface: '#ffffff',
-  surfaceAlt: '#eef2f7',
-  border: '#e1e7ef',
-  text: '#1a2332'
-}
-
 /** 根据状态获取色板：基础色固定，仅强调色随状态变化 */
 function getStatePalette(state: MascotState): MascotPalette {
   switch (state) {
     case 'recording':
-      return { ...BASE_PALETTE, accent: '#2b7fff' }
+      return {
+        surface: '#f6fbff',
+        surfaceAlt: '#dbeafe',
+        border: '#8bb9ff',
+        text: '#153967',
+        accent: '#2b7fff'
+      }
     case 'paused':
-      return { ...BASE_PALETTE, accent: '#f5a623' }
+      return {
+        surface: '#fff8ec',
+        surfaceAlt: '#ffe2b8',
+        border: '#f6b45d',
+        text: '#7b4308',
+        accent: '#f5a623'
+      }
     case 'privacy':
-      return { ...BASE_PALETTE, accent: '#8b5cf6' }
+      return {
+        surface: '#f7f3ff',
+        surfaceAlt: '#e7dbff',
+        border: '#b59afb',
+        text: '#54218c',
+        accent: '#8b5cf6'
+      }
     case 'ocr_scanning':
-      return { ...BASE_PALETTE, accent: '#22c5d8' }
+      return {
+        surface: '#f0fdff',
+        surfaceAlt: '#c8f5fb',
+        border: '#6fd9e8',
+        text: '#13556a',
+        accent: '#22c5d8'
+      }
     case 'report_ready':
-      return { ...BASE_PALETTE, accent: '#22b56a' }
+      return {
+        surface: '#f2fff7',
+        surfaceAlt: '#d1f5df',
+        border: '#73d79c',
+        text: '#125534',
+        accent: '#22b56a'
+      }
     default:
-      return { ...BASE_PALETTE, accent: '#2b7fff' }
+      return {
+        surface: '#f6fbff',
+        surfaceAlt: '#dbeafe',
+        border: '#8bb9ff',
+        text: '#153967',
+        accent: '#2b7fff'
+      }
   }
 }
 
@@ -674,6 +723,40 @@ function PaperFigure({ state }: { state: MascotState }): JSX.Element {
       <StateAccent state={state} palette={palette} />
     </svg>
   )
+}
+
+function getMascotTitle(style: MascotStyle): string {
+  switch (style) {
+    case 'note':
+      return '便签伙伴'
+    case 'film':
+      return '胶片伙伴'
+    case 'copilot':
+      return '副驾伙伴'
+    case 'cursor':
+      return '光标伙伴'
+    case 'paper':
+      return '纸页伙伴'
+    default:
+      return '桌面伙伴'
+  }
+}
+
+function getStateCopy(state: MascotState): string {
+  switch (state) {
+    case 'recording':
+      return '轻量悬浮陪伴中，正在安静记录今天的工作节奏。'
+    case 'paused':
+      return '先歇一下，等你回来我再继续跟上进度。'
+    case 'privacy':
+      return '已切到隐私模式，当前桌面内容不会被继续打扰。'
+    case 'ocr_scanning':
+      return '正在识别屏幕信息，结果出来后会尽快提醒你。'
+    case 'report_ready':
+      return '今天的日报已经整理好，可以直接点开查看。'
+    default:
+      return '随时待命。'
+  }
 }
 
 // -------------------- 状态指示器 --------------------

@@ -29,6 +29,7 @@ import type { SegmentLike } from '../capture/ActionFlowInferrer'
 import type { PpOcrEngine } from './PpOcrEngine'
 import type { OcrResult } from './PpOcrEngine'
 import { getOcrTextCleaner } from './OcrTextCleaner'
+import { logRuntime } from '../runtimeLog'
 
 /** OcrQueue 配置 */
 export interface OcrQueueConfig {
@@ -148,7 +149,7 @@ export class OcrQueue extends EventEmitter {
     try {
       await this.processNext(segmentId)
     } catch (e) {
-      console.error(`[OcrQueue] 处理 Segment ${segmentId} 异常:`, e instanceof Error ? e.message : String(e))
+      logRuntime('ocr', `[OcrQueue] 处理 Segment ${segmentId} 异常: ${e instanceof Error ? e.stack ?? e.message : String(e)}`)
       this.emit('ocr-failed', segmentId, e instanceof Error ? e : new Error(String(e)))
     } finally {
       this.processing.delete(segmentId)
@@ -164,7 +165,7 @@ export class OcrQueue extends EventEmitter {
     // 1. 读取 Segment
     const segment = SegmentRepository.getById(segmentId)
     if (!segment) {
-      console.warn(`[OcrQueue] Segment ${segmentId} 不存在，跳过`)
+      logRuntime('ocr', `[OcrQueue] Segment ${segmentId} 不存在，跳过`)
       return
     }
 
@@ -210,7 +211,7 @@ export class OcrQueue extends EventEmitter {
     // 初始化后仍未加载（无可用后端，进入"未配置"状态）：
     // 保持 segment 为 pending 状态，不标记 ocr_failed
     if (!this.engine.isLoaded()) {
-      console.warn(`[OcrQueue] OCR 后端未配置，Segment ${segmentId} 保持 pending 状态`)
+      logRuntime('ocr', `[OcrQueue] OCR 后端未配置，Segment ${segmentId} 保持 pending 状态`)
       return
     }
 
@@ -335,10 +336,7 @@ export class OcrQueue extends EventEmitter {
       })
       result.activityType = activity.activityType
     } catch (e) {
-      console.error(
-        `[OcrQueue] ActivityClassifier 失败 (segment=${segment.id}):`,
-        e instanceof Error ? e.message : String(e)
-      )
+      logRuntime('ocr', `[OcrQueue] ActivityClassifier 失败 (segment=${segment.id}): ${e instanceof Error ? e.stack ?? e.message : String(e)}`)
     }
 
     // 2. ContentClassifier：内容类型分类 + 结构化数据提取
@@ -352,10 +350,7 @@ export class OcrQueue extends EventEmitter {
       result.contentType = content.contentType
       result.contentData = content.contentData
     } catch (e) {
-      console.error(
-        `[OcrQueue] ContentClassifier 失败 (segment=${segment.id}):`,
-        e instanceof Error ? e.message : String(e)
-      )
+      logRuntime('ocr', `[OcrQueue] ContentClassifier 失败 (segment=${segment.id}): ${e instanceof Error ? e.stack ?? e.message : String(e)}`)
     }
 
     // 3. LayoutAnalyzer：UI 布局分析（基于 ocrBlocks 坐标分布）
@@ -363,10 +358,7 @@ export class OcrQueue extends EventEmitter {
       const layout = analyzeLayout(ocrBlocks)
       result.layoutType = layout.layoutType
     } catch (e) {
-      console.error(
-        `[OcrQueue] LayoutAnalyzer 失败 (segment=${segment.id}):`,
-        e instanceof Error ? e.message : String(e)
-      )
+      logRuntime('ocr', `[OcrQueue] LayoutAnalyzer 失败 (segment=${segment.id}): ${e instanceof Error ? e.stack ?? e.message : String(e)}`)
     }
 
     // 4. BrowserContextCollector：浏览器 URL 采集
@@ -379,10 +371,7 @@ export class OcrQueue extends EventEmitter {
         result.browserUrl = browser.url
       }
     } catch (e) {
-      console.error(
-        `[OcrQueue] BrowserContextCollector 失败 (segment=${segment.id}):`,
-        e instanceof Error ? e.message : String(e)
-      )
+      logRuntime('ocr', `[OcrQueue] BrowserContextCollector 失败 (segment=${segment.id}): ${e instanceof Error ? e.stack ?? e.message : String(e)}`)
     }
 
     // 5. ActionFlowInferrer：操作流推断（需要同窗口的前一个 segment）
@@ -402,10 +391,7 @@ export class OcrQueue extends EventEmitter {
         result.actionFlow = flow.actionFlow
       }
     } catch (e) {
-      console.error(
-        `[OcrQueue] ActionFlowInferrer 失败 (segment=${segment.id}):`,
-        e instanceof Error ? e.message : String(e)
-      )
+      logRuntime('ocr', `[OcrQueue] ActionFlowInferrer 失败 (segment=${segment.id}): ${e instanceof Error ? e.stack ?? e.message : String(e)}`)
     }
 
     return result
@@ -435,7 +421,7 @@ export class OcrQueue extends EventEmitter {
 
   /** OCR 失败回调 */
   private onOcrFailure(segment: WorkSegment, error: Error): void {
-    console.error(`[OcrQueue] Segment ${segment.id} OCR 失败:`, error.message)
+    logRuntime('ocr', `[OcrQueue] Segment ${segment.id} OCR 失败: ${error.stack ?? error.message}`)
     SegmentRepository.update(segment.id, {
       sourceStatus: 'ocr_failed',
       ocrText: '',

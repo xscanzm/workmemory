@@ -91,6 +91,16 @@ describe('BrowserContextCollector', () => {
       expect(result.url).toBe('')
       expect(result.confidence).toBe(0.6)
     })
+
+    it('Edge + 带个人配置后缀标题 → title_parse, 0.6', () => {
+      const result = collectBrowserUrl({
+        processName: 'msedge.exe',
+        windowTitle: '主页 / X 和另外 4 个页面 - 个人 - Microsoft Edge'
+      })
+      expect(result.method).toBe('title_parse')
+      expect(result.url).toBe('')
+      expect(result.confidence).toBe(0.6)
+    })
   })
 
   describe('Firefox 标题解析', () => {

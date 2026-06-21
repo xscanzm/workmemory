@@ -13,6 +13,7 @@
  * 硬约束：不监听键盘，仅编排窗口/截图/隐私模块。
  */
 import { EventEmitter } from 'node:events'
+import { powerMonitor } from 'electron'
 import type { RecordingState } from '@/types'
 import { SegmentRepository } from '../db/repositories/SegmentRepository'
 import { WindowWatcher } from './WindowWatcher'
@@ -30,6 +31,10 @@ import { getMainWindow } from '../main/window'
 /** IPC 广播通道名：无痕模式检测到 / 清除 */
 const IPC_INCOGNITO_DETECTED = 'mascot:incognito-detected'
 const IPC_INCOGNITO_CLEARED = 'mascot:incognito-cleared'
+/** 与 CaptureDecision 空闲阈值对齐：3 分钟无活动进入 idle */
+const SYSTEM_IDLE_THRESHOLD_SECONDS = 3 * 60
+/** 系统活动轮询间隔（毫秒） */
+const ACTIVITY_POLL_INTERVAL_MS = 15000
 
 /**
  * CaptureManager：捕获全链路编排单例。
@@ -45,6 +50,7 @@ export class CaptureManager extends EventEmitter {
   private screenshot: typeof Screenshot
   private privacyGuard: PrivacyGuard
   private decision: CaptureDecision
+  private activityTimer: NodeJS.Timeout | null = null
 
   /** 基础状态（不含 privacy 覆盖） */
   private baseState: RecordingState = 'idle'
@@ -77,6 +83,7 @@ export class CaptureManager extends EventEmitter {
     this.watcher.start()
     this.decision.start()
     this.setBaseState('recording')
+    this.startActivityMonitor()
     // 启动时清理过期截图
     if (this.screenshotRetentionDays > 0) {
       this.screenshot.cleanExpiredScreenshots(this.screenshotRetentionDays)
@@ -86,6 +93,7 @@ export class CaptureManager extends EventEmitter {
 
   /** 停止捕获 */
   stopCapture(): boolean {
+    this.stopActivityMonitor()
     this.decision.stop()
     this.watcher.stop()
     this.setBaseState('idle')
@@ -94,6 +102,7 @@ export class CaptureManager extends EventEmitter {
 
   /** 暂停捕获 */
   pauseCapture(): boolean {
+    this.stopActivityMonitor()
     this.decision.pause()
     this.setBaseState('paused')
     return true
@@ -103,6 +112,8 @@ export class CaptureManager extends EventEmitter {
   resumeCapture(): boolean {
     this.decision.resume()
     this.setBaseState('recording')
+    this.startActivityMonitor()
+    this.handleUserBecameActive()
     return true
   }
 
@@ -235,6 +246,50 @@ export class CaptureManager extends EventEmitter {
   private setBaseState(state: RecordingState): void {
     this.baseState = state
     this.broadcastState()
+  }
+
+  private startActivityMonitor(): void {
+    if (this.activityTimer) return
+
+    const poll = (): void => {
+      if (this.baseState === 'paused') return
+
+      try {
+        const idleSeconds = powerMonitor.getSystemIdleTime()
+
+        if (idleSeconds >= SYSTEM_IDLE_THRESHOLD_SECONDS) {
+          if (!this.privacyMode && this.baseState !== 'idle') {
+            this.setBaseState('idle')
+          }
+          return
+        }
+
+        this.handleUserBecameActive()
+      } catch (e) {
+        console.warn('[CaptureManager] 读取系统空闲时间失败:', e instanceof Error ? e.message : String(e))
+      }
+    }
+
+    poll()
+    this.activityTimer = setInterval(poll, ACTIVITY_POLL_INTERVAL_MS)
+  }
+
+  private stopActivityMonitor(): void {
+    if (this.activityTimer) {
+      clearInterval(this.activityTimer)
+      this.activityTimer = null
+    }
+  }
+
+  private handleUserBecameActive(): void {
+    if (this.baseState === 'paused') return
+
+    const activeWindow = this.watcher.getActiveWindowSnapshot() ?? this.watcher.getLastWindowInfo()
+    this.decision.wakeFromActivity(activeWindow)
+
+    if (!this.privacyMode && this.baseState === 'idle') {
+      this.setBaseState('recording')
+    }
   }
 
   private broadcastState(): void {

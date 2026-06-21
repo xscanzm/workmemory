@@ -21,6 +21,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
 import type { OcrModel } from '@/types'
+import { logRuntime } from '../runtimeLog'
 
 /** OCR 文本框 */
 export interface OcrBox {
@@ -82,13 +83,15 @@ const RECOGNIZE_TIMEOUT_MS = 130000
 /** PP-OCRv6 server 首次冷启动超时（毫秒） */
 const SERVER_START_TIMEOUT_MS = 120000
 /** PP-OCRv6 server 热识别超时（毫秒） */
-const SERVER_RECOGNIZE_TIMEOUT_MS = 5000
+const SERVER_RECOGNIZE_TIMEOUT_MS = 20000
 /** 小图阈值：宽或高 <200 视为文字较少，使用单核推理 */
 const SMALL_IMAGE_THRESHOLD = 200
 /** 默认 CPU 线程数：屏幕 OCR 使用 tiny 模型，优先控制资源占用 */
 const DEFAULT_CPU_THREADS = 2
 /** 子进程超时（毫秒） */
-const PROCESS_TIMEOUT_MS = 28000
+const PROCESS_TIMEOUT_MS = 60000
+/** 默认启用 server 模式；仅在显式设置 WORKMEMORY_OCR_SERVER=0 时关闭 */
+const PADDLE_SERVER_MODE_ENABLED = process.env.WORKMEMORY_OCR_SERVER !== '0'
 
 function getPaddleOcrEnv(): NodeJS.ProcessEnv {
   return {
@@ -244,6 +247,9 @@ export class PaddleOcrBackend implements IOcrBackend {
     if (!this.isAvailable()) {
       return Promise.reject(new Error('PaddleOcrBackend 不可用：CLI 不存在'))
     }
+    if (!PADDLE_SERVER_MODE_ENABLED) {
+      return this.runOneShotCli(imageBuffer, options)
+    }
     if (this.serverUnsupported) {
       return this.runOneShotCli(imageBuffer, options)
     }
@@ -259,11 +265,12 @@ export class PaddleOcrBackend implements IOcrBackend {
     try {
       await this.ensureServer()
     } catch (e) {
-      if (this.isServerUnsupportedError(e)) {
+      const error = e instanceof Error ? e : new Error(String(e))
+      if (this.isServerUnsupportedError(error)) {
         this.serverUnsupported = true
-        return this.runOneShotCli(imageBuffer, { timeoutMs: PROCESS_TIMEOUT_MS })
       }
-      throw e
+      logRuntime('ocr', `[PaddleOcrBackend] server 不可用，回退单次 CLI: ${error.message}`)
+      return this.runOneShotCli(imageBuffer, { timeoutMs: PROCESS_TIMEOUT_MS })
     }
 
     let tempPath = ''
@@ -339,9 +346,9 @@ export class PaddleOcrBackend implements IOcrBackend {
       })
       child.on('close', (code) => {
         const stderr = this.stderrBuffer.trim()
-        this.server = null
-        this.serverStarting = null
-        this.rejectAllWaiters(new Error(`PaddleOcrBackend server 已退出，退出码 ${code ?? 'unknown'}${stderr ? `: ${stderr}` : ''}`))
+      this.server = null
+      this.serverStarting = null
+      this.rejectAllWaiters(new Error(`PaddleOcrBackend server 已退出，退出码 ${code ?? 'unknown'}${stderr ? `: ${stderr}` : ''}`))
       })
     }).finally(() => {
       this.serverStarting = null
@@ -356,8 +363,12 @@ export class PaddleOcrBackend implements IOcrBackend {
       return Promise.reject(new Error('PaddleOcrBackend server 不可用'))
     }
 
+    const normalizedPayload = { ...payload }
+    if (typeof normalizedPayload.image_path === 'string') {
+      normalizedPayload.image_path = normalizedPayload.image_path.replaceAll('\\', '/')
+    }
     const linePromise = this.waitForJsonLine(timeoutMs)
-    this.server.stdin.write(`${JSON.stringify(payload)}\n`, 'utf8')
+    this.server.stdin.write(`${JSON.stringify(normalizedPayload)}\n`, 'utf8')
     return linePromise
   }
 
@@ -837,14 +848,14 @@ export class PpOcrEngine {
       // 无可用后端：进入"未配置"状态，不抛错
       this.loaded = false
       this.configured = false
-      console.warn('[PpOcrEngine] 未找到可用的 OCR 后端，进入"未配置"状态。请检查内置 PP-OCRv6 runtime 或系统 Tesseract。')
+      logRuntime('ocr', '[PpOcrEngine] 未找到可用的 OCR 后端，进入未配置状态。请检查内置 PP-OCRv6 runtime 或系统 Tesseract。')
       return
     }
     this.configured = true
     const modelPath = getModelPath(this.model)
     await this.backend.loadModel(modelPath)
     this.loaded = true
-    console.log(`[PpOcrEngine] 初始化完成，后端: ${this.backend.getName()}, 模型: ${this.model}`)
+    logRuntime('ocr', `[PpOcrEngine] 初始化完成，后端=${this.backend.getName()} 模型=${this.model} serverMode=${PADDLE_SERVER_MODE_ENABLED ? 'on' : 'off'}`)
   }
 
   /**
@@ -890,7 +901,7 @@ export class PpOcrEngine {
       try {
         this.backend.release()
       } catch (e) {
-        console.warn('[PpOcrEngine] 释放后端资源失败:', e instanceof Error ? e.message : String(e))
+        logRuntime('ocr', `[PpOcrEngine] 释放后端资源失败: ${e instanceof Error ? e.message : String(e)}`)
       }
     }
     this.loaded = false

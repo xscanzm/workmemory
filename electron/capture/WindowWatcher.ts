@@ -87,7 +87,7 @@ export class Win32WindowInfoProvider implements IWindowInfoProvider {
         'void *OpenProcess(uint32_t dwDesiredAccess, bool bInheritHandle, uint32_t dwProcessId)'
       )
       this.fnQueryFullProcessImageNameW = this.kernel32.func(
-        'bool QueryFullProcessImageNameW(void *hProcess, bool bFlags, uint16_t *lpExeName, uint32_t *lpdwSize)'
+        'bool QueryFullProcessImageNameW(void *hProcess, uint32_t dwFlags, uint16_t *lpExeName, uint32_t *lpdwSize)'
       )
       this.fnCloseHandle = this.kernel32.func('bool CloseHandle(void *hObject)')
 
@@ -162,7 +162,7 @@ export class Win32WindowInfoProvider implements IWindowInfoProvider {
         const sizeBuf = Buffer.alloc(4)
         sizeBuf.writeUInt32LE(1024, 0)
         const nameBuf = Buffer.alloc(1024 * 2)
-        const ok = this.fnQueryFullProcessImageNameW(hProcess, false, nameBuf, sizeBuf)
+        const ok = this.fnQueryFullProcessImageNameW(hProcess, 0, nameBuf, sizeBuf)
         if (!ok) return ''
         const size = sizeBuf.readUInt32LE(0)
         return nameBuf.toString('utf16le', 0, size * 2)
@@ -300,6 +300,16 @@ export class WindowWatcher extends EventEmitter {
   /** 获取最近一次窗口信息 */
   getLastWindowInfo(): WindowInfo | null {
     return this.lastWindowInfo
+  }
+
+  /** 立即读取一次当前活动窗口快照（不依赖轮询事件） */
+  getActiveWindowSnapshot(): WindowInfo | null {
+    try {
+      return this.provider.getActiveWindow()
+    } catch (e) {
+      console.warn('[WindowWatcher] 获取活动窗口快照失败:', e instanceof Error ? e.message : String(e))
+      return null
+    }
   }
 
   private poll(): void {
