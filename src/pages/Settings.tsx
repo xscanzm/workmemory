@@ -24,7 +24,7 @@ import type {
   DataStats,
   OcrRuntimeStatus,
   OcrTestRecognizeResult
-} from '../../electron/types/ipc'
+} from '../types/ipc'
 import {
   Button,
   Card,

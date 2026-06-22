@@ -29,7 +29,7 @@ import {
   type BadgeVariant
 } from '@/ui'
 import type { CleanEpisode, Episode, WorkSegment } from '@/types'
-import type { FtsSearchResult, HybridSearchResult, HybridMatchType } from '../../electron/types/ipc'
+import type { FtsSearchResult, HybridSearchResult, HybridMatchType } from '../types/ipc'
 import './Search.css'
 
 /** 每日总结标记 topic */

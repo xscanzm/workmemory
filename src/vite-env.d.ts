@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import type { WorkMemoryApi } from '../electron/types/ipc'
+import type { WorkMemoryApi } from './types/ipc'
 
 declare global {
   interface Window {

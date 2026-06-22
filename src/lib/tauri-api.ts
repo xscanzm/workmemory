@@ -2,7 +2,7 @@
  * Tauri 前端 API 适配器
  *
  * 用 @tauri-apps/api 的 invoke() 替换原 Electron window.workmemory.* IPC 通道。
- * 该对象实现与 electron/types/ipc.ts 中 WorkMemoryApi 完全一致的接口，
+ * 该对象实现与 src/types/ipc.ts 中 WorkMemoryApi 完全一致的接口，
  * 作为渲染进程的 drop-in 替换：前端组件代码无需任何改动。
  *
  * 命令名映射到 src-tauri/src/ipc/commands.rs 中注册的 #[tauri::command] 函数。
@@ -16,7 +16,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { listen } from '@tauri-apps/api/event'
-import type { MascotBubbleData, WorkMemoryApi } from '../../electron/types/ipc'
+import type { MascotBubbleData, WorkMemoryApi } from '../types/ipc'
 
 /* ===================== 内部辅助函数 ===================== */
 

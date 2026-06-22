@@ -11,8 +11,8 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useRecordingStore } from '@/store/recordingStore'
 import { renderMarkdown } from '@/utils/markdown'
-import { markdownToRichHtml } from '../../electron/ai/HtmlExporter'
-import { maskSensitive } from '../../electron/ai/SensitiveMasker'
+import { markdownToRichHtml } from '../lib/htmlExporter'
+import { maskSensitive } from '../lib/sensitiveMasker'
 import { getTodayDate } from '@/utils/datetime'
 import {
   Button,
@@ -47,7 +47,7 @@ import {
 } from '@/ui'
 import type { Episode, Report, ReportTemplate, ReportStatus } from '@/types'
 import type { CleanEpisode, EvidenceRef, ReportInputSnapshot, ReportSnapshotItem, SourceQuality } from '@/types'
-import type { AiGenerateReportPayload, AiGenerateReportResult } from '../../electron/types/ipc'
+import type { AiGenerateReportPayload, AiGenerateReportResult } from '../types/ipc'
 import './Reports.css'
 
 // ===================== 常量 =====================

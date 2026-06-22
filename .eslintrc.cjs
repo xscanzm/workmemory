@@ -30,5 +30,5 @@ module.exports = {
     '@typescript-eslint/consistent-type-imports': 'off',
     'no-empty': ['error', { allowEmptyCatch: true }]
   },
-  ignorePatterns: ['dist', 'dist-electron', 'release', 'node_modules', '*.config.ts']
+  ignorePatterns: ['dist', 'dist-electron', 'release', 'node_modules', '*.config.ts', 'scripts']
 }

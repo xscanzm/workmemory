@@ -4,7 +4,6 @@
   "description": "WorkMemory 今日记忆 - Windows 本地工作记忆与认知资产助手",
   "author": "WorkMemory",
   "license": "MIT",
-  "main": "dist-electron/main/index.js",
   "scripts": {
     "dev": "vite",
     "tauri:dev": "tauri dev",
@@ -13,8 +12,7 @@
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ext .ts,.tsx --max-warnings 0",
-    "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"electron/**/*.{ts,tsx}\"",
-    "dist": "npm run build:ocr && npm run build && electron-builder --win nsis"
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\""
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.17",
@@ -26,9 +24,6 @@
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-clipboard-manager": "^2",
     "@tauri-apps/plugin-dialog": "^2",
-    "better-sqlite3": "^11.5.0",
-    "docx": "^9.7.1",
-    "koffi": "^3.0.2",
     "lucide-react": "^1.21.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -38,15 +33,12 @@
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",
-    "@types/better-sqlite3": "^7.6.11",
     "@types/node": "^20.14.15",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "@typescript-eslint/eslint-plugin": "^7.18.0",
     "@typescript-eslint/parser": "^7.18.0",
     "@vitejs/plugin-react": "^4.3.1",
-    "electron": "^31.4.0",
-    "electron-builder": "^24.13.3",
     "eslint": "^8.57.0",
     "eslint-plugin-react": "^7.35.2",
     "eslint-plugin-react-hooks": "^4.6.2",
@@ -54,44 +46,6 @@
     "prettier": "^3.3.3",
     "typescript": "^5.5.4",
     "vite": "^5.4.3",
-    "vite-plugin-electron": "^0.28.8",
-    "vite-plugin-electron-renderer": "^0.14.6",
     "vitest": "^4.1.9"
-  },
-  "build": {
-    "appId": "com.workmemory.app",
-    "productName": "WorkMemory",
-    "directories": {
-      "output": "release",
-      "buildResources": "build"
-    },
-    "files": [
-      "dist/**/*",
-      "dist-electron/**/*"
-    ],
-    "extraResources": [
-      {
-        "from": "resources/ocr",
-        "to": "resources/ocr",
-        "filter": [
-          "**/*"
-        ]
-      }
-    ],
-    "asarUnpack": [
-      "**/*.{node,dll}"
-    ],
-    "win": {
-      "target": "nsis",
-      "icon": "build/icon.ico"
-    },
-    "nsis": {
-      "oneClick": false,
-      "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "WorkMemory"
-    }
   }
 }
