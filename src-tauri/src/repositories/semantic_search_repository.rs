@@ -30,7 +30,7 @@ use crate::db::database::get_database;
 const SNIPPET_TOKENS: i64 = 12;
 
 /// 匹配类型
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum MatchType {
     /// 关键词匹配
     Keyword,
@@ -81,7 +81,7 @@ impl Default for HybridSearchOptions {
 }
 
 /// 混合检索单条结果
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SearchResult {
     /// 关联的 MemCell ID
     pub mem_cell_id: String,

@@ -180,6 +180,32 @@ pub enum MascotState {
     Privacy,
     OcrScanning,
     ReportReady,
+    /// 用户聚焦工作（spec F12.1 新增）
+    Focused,
+}
+
+impl MascotState {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            MascotState::Recording => "recording",
+            MascotState::Paused => "paused",
+            MascotState::Privacy => "privacy",
+            MascotState::OcrScanning => "ocr_scanning",
+            MascotState::ReportReady => "report_ready",
+            MascotState::Focused => "focused",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "paused" => MascotState::Paused,
+            "privacy" => MascotState::Privacy,
+            "ocr_scanning" => MascotState::OcrScanning,
+            "report_ready" => MascotState::ReportReady,
+            "focused" => MascotState::Focused,
+            _ => MascotState::Recording,
+        }
+    }
 }
 
 /// 日报模板
@@ -222,7 +248,7 @@ impl ReportTemplate {
 }
 
 /// 本地 OCR 模型
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum OcrModel {
     Tiny,
@@ -492,7 +518,7 @@ impl EntityRefType {
 }
 
 /// 用户活动类型
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ActivityType {
     Coding,
@@ -744,6 +770,7 @@ impl WikiStatus {
 
 /// 实体引用（从 Episode 提取的人/项目/文档/URL）
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct EntityRef {
     #[serde(rename = "type")]
     pub ref_type: EntityRefType,
@@ -758,6 +785,7 @@ pub struct EntityRef {
 
 /// OCR 文本块证据
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct OcrBlock {
     pub text: String,
     pub box_rect: OcrBox,
@@ -765,6 +793,7 @@ pub struct OcrBlock {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct OcrBox {
     pub x: f64,
     pub y: f64,
@@ -773,6 +802,7 @@ pub struct OcrBox {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct BoundsRect {
     pub x: i32,
     pub y: i32,
@@ -782,6 +812,7 @@ pub struct BoundsRect {
 
 /// 原始工作片段：一次窗口活动 + OCR 结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WorkSegment {
     pub id: String,
     /// YYYY-MM-DD
@@ -896,6 +927,7 @@ impl Default for WorkSegment {
 
 /// Episode：语义合并后的工作事件
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Episode {
     pub id: String,
     pub date: String,
@@ -916,6 +948,7 @@ pub struct Episode {
 
 /// 证据引用
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct EvidenceRef {
     pub segment_id: String,
     pub quote: String,
@@ -924,6 +957,7 @@ pub struct EvidenceRef {
 
 /// CleanEpisode：工作记忆事件
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CleanEpisode {
     pub id: String,
     pub date: String,
@@ -955,6 +989,7 @@ pub struct CleanEpisode {
 
 /// Wiki 知识页（双链沉淀）
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WikiPage {
     pub id: String,
     pub wiki_type: WikiType,
@@ -975,6 +1010,7 @@ pub struct WikiPage {
 
 /// 日报/周报
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Report {
     pub id: String,
     pub date: String,
@@ -990,6 +1026,7 @@ pub struct Report {
 
 /// 隐私规则
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PrivacyRule {
     pub id: String,
     pub rule_type: PrivacyRuleType,
@@ -1000,6 +1037,7 @@ pub struct PrivacyRule {
 
 /// 隐私规则匹配结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PrivacyMatchResult {
     pub action: PrivacyAction,
     pub matched_rule: Option<PrivacyRule>,
@@ -1007,6 +1045,7 @@ pub struct PrivacyMatchResult {
 
 /// 应用设置（UI 可见字段，不含明文 API Key）
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AppSettings {
     pub auto_start: bool,
     pub screenshot_retention_days: i32,
@@ -1050,6 +1089,7 @@ impl Default for AppSettings {
 
 /// MemCell 元数据
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MemCellMetadata {
     #[serde(default)]
     pub segment_ids: Vec<String>,
@@ -1071,6 +1111,7 @@ impl Default for MemCellMetadata {
 
 /// Foresight（前瞻性洞察）
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Foresight {
     pub text: String,
     #[serde(default)]
@@ -1079,6 +1120,7 @@ pub struct Foresight {
 
 /// MemCell：结构化记忆单元
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MemCell {
     pub id: String,
     pub clean_episode_id: String,
@@ -1091,6 +1133,7 @@ pub struct MemCell {
 
 /// MemScene：主题场景
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MemScene {
     pub id: String,
     pub title: String,
@@ -1103,6 +1146,7 @@ pub struct MemScene {
 
 /// 因果链
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CausalChain {
     pub id: String,
     pub cause_cell_id: String,
@@ -1115,6 +1159,7 @@ pub struct CausalChain {
 
 /// 日级主题
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DayTheme {
     pub name: String,
     pub summary: String,
@@ -1124,6 +1169,7 @@ pub struct DayTheme {
 
 /// 日级模式
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DayPattern {
     pub deep_work_hours: f64,
     pub fragmented_periods: Vec<TimeRange>,
@@ -1133,6 +1179,7 @@ pub struct DayPattern {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TimeRange {
     pub start: String,
     pub end: String,
@@ -1140,6 +1187,7 @@ pub struct TimeRange {
 
 /// 日级理解结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DayDistillResult {
     pub date: String,
     pub summary: String,
@@ -1150,6 +1198,7 @@ pub struct DayDistillResult {
 
 /// 周级模式
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WeeklyPattern {
     pub name: String,
     pub description: String,
@@ -1159,6 +1208,7 @@ pub struct WeeklyPattern {
 
 /// 周级趋势
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WeeklyPatternTrend {
     #[serde(default)]
     pub deep_work_hours_trend: Vec<f64>,
@@ -1170,6 +1220,7 @@ pub struct WeeklyPatternTrend {
 
 /// 周级模式结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WeeklyPatternResult {
     pub week_start: String,
     pub patterns: Vec<WeeklyPattern>,
@@ -1179,6 +1230,7 @@ pub struct WeeklyPatternResult {
 
 /// 反思报告
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ReflectionReport {
     pub week_start: String,
     #[serde(default)]
@@ -1192,6 +1244,7 @@ pub struct ReflectionReport {
 
 /// 技能卡
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Skill {
     pub id: String,
     pub title: String,
@@ -1232,6 +1285,7 @@ impl FeedbackEventType {
 
 /// 反馈事件
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FeedbackEvent {
     pub id: String,
     pub event_type: FeedbackEventType,
@@ -1267,6 +1321,7 @@ impl ProfileType {
 
 /// 用户画像条目
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UserProfileEntry {
     pub key: String,
     pub value: String,

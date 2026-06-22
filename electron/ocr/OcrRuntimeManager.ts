@@ -17,7 +17,6 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { OcrModel } from '@/types'
 import {
-  PpOcrEngine,
   getBackendStatus,
   getOcrResourcesPath,
   getPaddleOcrCliPath,
