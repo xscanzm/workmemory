@@ -8,7 +8,7 @@
  * - 创建无边框主窗口
  * - 注册 IPC 处理器
  */
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, dialog } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
 import { createMainWindow } from './window'
@@ -72,9 +72,9 @@ async function bootstrap(): Promise<void> {
   initDatabase()
   logMain('database initialized')
 
-  // 初始化隐私防护中心：seed 默认规则到 privacy_rules 表
+  // 初始化隐私防护中心：默认规则由 CaptureManager.startCapture() 内的
+  // PrivacyGuard.seedDefaultRules() 统一播种，此处不再重复调用（避免双重播种）。
   const captureManager = getCaptureManager()
-  captureManager.getPrivacyGuard().seedDefaultRules()
 
   // 启动时同步截图降级策略。默认值为 true，保证安装后默认即可记录；
   // 用户在设置页关闭后仍然会按持久化设置生效。
@@ -211,12 +211,10 @@ async function bootstrap(): Promise<void> {
 
 app.whenReady().then(() => {
   void bootstrap().catch((e) => {
+    const errorSummary = `WorkMemory 启动失败。\n\n类型: ${e instanceof Error ? e.name : 'Unknown'}\n详情: ${e instanceof Error ? e.message : String(e)}\n\n建议操作：\n- 检查工作目录权限与磁盘空间\n- 查看日志文件 runtime.log\n- 如持续失败请联系支持`
     logMain(`bootstrap failed: ${e instanceof Error ? e.stack ?? e.message : String(e)}`)
-    try {
-      createMainWindow()
-    } catch (inner) {
-      logMain(`fallback createMainWindow failed: ${inner instanceof Error ? inner.stack ?? inner.message : String(inner)}`)
-    }
+    dialog.showErrorBox('WorkMemory 启动失败', errorSummary)
+    app.quit()
   })
 
   app.on('activate', () => {
@@ -234,8 +232,13 @@ process.on('unhandledRejection', (reason) => {
   logMain(`unhandledRejection: ${reason instanceof Error ? reason.stack ?? reason.message : String(reason)}`)
 })
 
-app.on('window-all-closed', () => {
-  // 停止捕获与 OCR，释放资源
+/**
+ * 统一停止所有后台服务并关闭数据库。
+ *
+ * 在 before-quit 事件中注册一次，避免 window-all-closed + before-quit 双重执行
+ * 导致每个 Manager.stop() 被调用两次（P0.3 修复）。
+ */
+function stopAllServices(): void {
   try {
     getMascotManager().stop()
     getInsightsManager().stop()
@@ -246,26 +249,22 @@ app.on('window-all-closed', () => {
     getOcrManager().stop()
     getCaptureManager().stopCapture()
   } catch (e) {
-    console.warn('[Main] 停止服务失败:', e)
+    logMain(`stop services failed: ${e instanceof Error ? e.message : String(e)}`)
   }
-  closeDatabase()
+  try {
+    closeDatabase()
+  } catch (e) {
+    logMain(`close database failed: ${e instanceof Error ? e.message : String(e)}`)
+  }
+}
+
+app.on('window-all-closed', () => {
+  // 服务停止统一由 before-quit 处理，此处仅负责退出决策
   if (process.platform !== 'darwin') {
     app.quit()
   }
 })
 
 app.on('before-quit', () => {
-  try {
-    getMascotManager().stop()
-    getInsightsManager().stop()
-    getWikiIngestManager().stop()
-    getMemCellIndexer().stopIndexing()
-    getDistillManager().stop()
-    getEpisodeManager().stop()
-    getOcrManager().stop()
-    getCaptureManager().stopCapture()
-  } catch (e) {
-    console.warn('[Main] before-quit 停止服务失败:', e)
-  }
-  closeDatabase()
+  stopAllServices()
 })
